@@ -1,1 +1,7 @@
 torch
+pytorch_lightning
+numpy
+pandas
+scikit-learn
+pyarrow
+mlflow
