@@ -137,13 +137,15 @@ def train_fasttext(
     val_texts = []
     for _, item in df_val.iterrows():
         formatted_item = item[text_feature]
+        for feature in categorical_features:
+            formatted_item += f" {feature}_{item[feature]}"
         val_texts.append(formatted_item)
 
     predictions = model.predict(val_texts, k=1)
     predictions = [x[0].replace("__label__", "") for x in predictions[0]]
 
     booleans = [
-        prediction == label
+        prediction == str(label)
         for prediction, label in zip(predictions, df_val[y])
     ]
     accuracy = sum(booleans) / len(booleans)
@@ -191,7 +193,7 @@ if __name__ == "__main__":
             params={
                 "max_epochs": 50,
                 "train_proportion": 0.8,
-                "lr": 0.001,
+                "lr": 0.2,
                 "buckets": 2000000,
                 "dim": 50,
                 "minCount": 1,
