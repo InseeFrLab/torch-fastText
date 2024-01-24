@@ -192,7 +192,7 @@ if __name__ == "__main__":
     # Subset of df to keep things short
     df = df.sample(frac=0.1)
     # Clean text feature
-    df = clean_text_feature(df)
+    df = clean_text_feature(df, text_feature="text")
     # Add fictitious additional variable
     df["additional_var"] = np.random.randint(0, 2, df.shape[0])
     # Encode classes
