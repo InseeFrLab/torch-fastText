@@ -204,6 +204,7 @@ class FastTextModule(pl.LightningModule):
         scheduler = self.scheduler(optimizer, **self.scheduler_params)
         scheduler = {
             "scheduler": scheduler,
+            "monitor": "validation_loss",
             "interval": self.scheduler_interval,
         }
 

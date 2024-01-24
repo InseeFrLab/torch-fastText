@@ -11,6 +11,7 @@ from torch.optim import Adam, SGD
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 import mlflow
 import pyarrow.parquet as pq
 from model import FastTextModule, FastTextModel
@@ -76,7 +77,7 @@ def train(
             X_train[column].to_list() for column in X_train[categorical_features]
         ],
         texts=training_text,
-        ouputs=y_train.to_list(),
+        outputs=y_train.to_list(),
         tokenizer=tokenizer,
     )
     val_dataset = FastTextModelDataset(
@@ -84,14 +85,20 @@ def train(
             X_val[column].to_list() for column in X_val[categorical_features]
         ],
         texts=X_val[text_feature].to_list(),
-        ouputs=y_val.to_list(),
+        outputs=y_val.to_list(),
         tokenizer=tokenizer,
     )
-    train_dataloader = train_dataset.create_dataloader(batch_size=batch_size)
-    val_dataloader = val_dataset.create_dataloader(batch_size=batch_size)
+    train_dataloader = train_dataset.create_dataloader(
+        batch_size=batch_size,
+        num_workers=60
+    )
+    val_dataloader = val_dataset.create_dataloader(
+        batch_size=batch_size,
+        num_workers=60
+    )
 
     # Compute num_classes and categorical_vocabulary_sizes
-    num_classes = len(np.unique(y_train))
+    num_classes = df[y].nunique()
     categorical_vocabulary_sizes = [
         len(np.unique(X_train[feature])) for feature in categorical_features
     ]
@@ -181,7 +188,11 @@ if __name__ == "__main__":
         filesystem=fs
     ).read_pandas().to_pandas()
     df["additional_var"] = np.random.randint(0, 2, df.shape[0])
+    # Encode classes
+    encoder = LabelEncoder()
+    df["nace"] = encoder.fit_transform(df["nace"])
 
+    # Start MLflow run
     mlflow.set_tracking_uri(remote_server_uri)
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run(run_name=run_name):

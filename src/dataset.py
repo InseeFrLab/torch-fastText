@@ -41,7 +41,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             int: Number of observations.
         """
-        return len(self.y)
+        return len(self.outputs)
 
     def __str__(self) -> str:
         """
@@ -113,7 +113,11 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         return (x, *categorical_tensors, y)
 
     def create_dataloader(
-        self, batch_size: int, shuffle: bool = False, drop_last: bool = False
+        self,
+        batch_size: int,
+        shuffle: bool = False,
+        drop_last: bool = False,
+        num_workers: int = 0,
     ) -> torch.utils.data.DataLoader:
         """
         Creates a Dataloader.
@@ -133,4 +137,5 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             shuffle=shuffle,
             drop_last=drop_last,
             pin_memory=True,
+            num_workers=num_workers
         )
