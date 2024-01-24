@@ -7,3 +7,4 @@ pyarrow
 mlflow
 unidecode
 nltk
+fasttext
