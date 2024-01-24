@@ -4,6 +4,7 @@ Integrates additional categorical features.
 """
 from typing import List
 import torch
+from torchmetrics import Accuracy
 from torch import nn
 import pytorch_lightning as pl
 
@@ -36,6 +37,7 @@ class FastTextModel(nn.Module):
             sparse (bool): Indicates if Embedding layer is sparse.
         """
         super(FastTextModel, self).__init__()
+        self.num_classes = num_classes
         self.padding_idx = padding_idx
 
         self.embeddings = nn.Embedding(
@@ -117,6 +119,10 @@ class FastTextModule(pl.LightningModule):
 
         self.model = model
         self.loss = loss
+        self.accuracy_fn = Accuracy(
+            task="multiclass",
+            num_classes=self.model.num_classes
+        )
         self.optimizer = optimizer
         self.optimizer_params = optimizer_params
         self.scheduler = scheduler
@@ -168,6 +174,8 @@ class FastTextModule(pl.LightningModule):
         loss = self.loss(outputs, targets)
         self.log("validation_loss", loss, on_epoch=True)
 
+        accuracy = self.accuracy_fn(outputs, targets)
+        self.log('validation_accuracy', accuracy, on_epoch=True)
         return loss
 
     def test_step(self, batch: List[torch.LongTensor], batch_idx: int):
