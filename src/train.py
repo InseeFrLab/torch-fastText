@@ -89,10 +89,10 @@ def train(
         tokenizer=tokenizer,
     )
     train_dataloader = train_dataset.create_dataloader(
-        batch_size=batch_size, num_workers=60
+        batch_size=batch_size, num_workers=100
     )
     val_dataloader = val_dataset.create_dataloader(
-        batch_size=batch_size, num_workers=60
+        batch_size=batch_size, num_workers=100
     )
 
     # Compute num_classes and categorical_vocabulary_sizes
@@ -188,6 +188,9 @@ if __name__ == "__main__":
         .read_pandas()
         .to_pandas()
     )
+    # Subset of df to keep things short
+    df = df.sample(frac=0.1)
+    # Add fictitious additional variable
     df["additional_var"] = np.random.randint(0, 2, df.shape[0])
     # Encode classes
     encoder = LabelEncoder()
