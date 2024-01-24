@@ -10,6 +10,7 @@ from torch import nn
 from torch.optim import Adam, SGD
 import pandas as pd
 import numpy as np
+import random
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import mlflow
@@ -173,6 +174,9 @@ def train(
 
 
 if __name__ == "__main__":
+    np.random.seed(0)
+    random.seed(0)
+
     remote_server_uri = sys.argv[1]
     experiment_name = sys.argv[2]
     run_name = sys.argv[3]
