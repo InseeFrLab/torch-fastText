@@ -137,5 +137,5 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             shuffle=shuffle,
             drop_last=drop_last,
             pin_memory=True,
-            num_workers=num_workers
+            num_workers=num_workers,
         )

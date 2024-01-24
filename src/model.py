@@ -135,9 +135,7 @@ class FastTextModule(pl.LightningModule):
         return self.model(inputs)
 
     def training_step(
-        self,
-        batch: List[torch.LongTensor],
-        batch_idx: int
+        self, batch: List[torch.LongTensor], batch_idx: int
     ) -> torch.Tensor:
         """
         Training step.
@@ -154,11 +152,7 @@ class FastTextModule(pl.LightningModule):
 
         return loss
 
-    def validation_step(
-        self,
-        batch: List[torch.LongTensor],
-        batch_idx: int
-    ):
+    def validation_step(self, batch: List[torch.LongTensor], batch_idx: int):
         """
         Validation step.
 
@@ -174,11 +168,7 @@ class FastTextModule(pl.LightningModule):
 
         return loss
 
-    def test_step(
-        self,
-        batch: List[torch.LongTensor],
-        batch_idx: int
-    ):
+    def test_step(self, batch: List[torch.LongTensor], batch_idx: int):
         """
         Test step.
 

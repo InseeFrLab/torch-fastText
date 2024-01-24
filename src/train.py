@@ -62,7 +62,7 @@ def train(
     X_train, X_val, y_train, y_val = train_test_split(
         df[features],
         df[y],
-        test_size=1-train_proportion,
+        test_size=1 - train_proportion,
         random_state=0,
         shuffle=True,
     )
@@ -89,12 +89,10 @@ def train(
         tokenizer=tokenizer,
     )
     train_dataloader = train_dataset.create_dataloader(
-        batch_size=batch_size,
-        num_workers=60
+        batch_size=batch_size, num_workers=60
     )
     val_dataloader = val_dataset.create_dataloader(
-        batch_size=batch_size,
-        num_workers=60
+        batch_size=batch_size, num_workers=60
     )
 
     # Compute num_classes and categorical_vocabulary_sizes
@@ -105,10 +103,10 @@ def train(
     # Model
     model = FastTextModel(
         embedding_dim=embedding_dim,
-        vocab_size=buckets+tokenizer.get_nwords()+1,
+        vocab_size=buckets + tokenizer.get_nwords() + 1,
         num_classes=num_classes,
         categorical_vocabulary_sizes=categorical_vocabulary_sizes,
-        padding_idx=buckets+tokenizer.get_nwords(),
+        padding_idx=buckets + tokenizer.get_nwords(),
         sparse=sparse,
     )
 
@@ -136,12 +134,14 @@ def train(
     )
 
     # Trainer callbacks
-    checkpoints = [{
-        "monitor": "validation_loss",
-        "save_top_k": 1,
-        "save_last": False,
-        "mode": "min"
-    }]
+    checkpoints = [
+        {
+            "monitor": "validation_loss",
+            "save_top_k": 1,
+            "save_last": False,
+            "mode": "min",
+        }
+    ]
     callbacks = [ModelCheckpoint(**checkpoint) for checkpoint in checkpoints]
     callbacks.append(
         EarlyStopping(
@@ -150,9 +150,7 @@ def train(
             mode="min",
         )
     )
-    callbacks.append(
-        LearningRateMonitor(logging_interval="step")
-    )
+    callbacks.append(LearningRateMonitor(logging_interval="step"))
 
     # Strategy
     strategy = "auto"
@@ -180,13 +178,16 @@ if __name__ == "__main__":
 
     # Load data
     fs = s3fs.S3FileSystem(
-        client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"},
-        anon=True
+        client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"}, anon=True
     )
-    df = pq.ParquetDataset(
-        "projet-formation/diffusion/mlops/data/firm_activity_data.parquet",
-        filesystem=fs
-    ).read_pandas().to_pandas()
+    df = (
+        pq.ParquetDataset(
+            "projet-formation/diffusion/mlops/data/firm_activity_data.parquet",
+            filesystem=fs,
+        )
+        .read_pandas()
+        .to_pandas()
+    )
     df["additional_var"] = np.random.randint(0, 2, df.shape[0])
     # Encode classes
     encoder = LabelEncoder()

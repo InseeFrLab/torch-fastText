@@ -89,7 +89,7 @@ class NGramTokenizer:
         Returns:
             List[str]: List of character n-grams.
         """
-        return [word[i: i + n] for i in range(len(word) - n + 1)]
+        return [word[i : i + n] for i in range(len(word) - n + 1)]
 
     def get_subword_index(self, subword: str) -> int:
         """
@@ -168,7 +168,7 @@ class NGramTokenizer:
         # Adding word n-grams
         for word_ngram_len in range(2, self.word_ngrams + 1):
             for i in range(len(words) - word_ngram_len + 1):
-                hashes = tuple(get_hash(word) for word in words[i: i + word_ngram_len])
+                hashes = tuple(get_hash(word) for word in words[i : i + word_ngram_len])
                 word_ngram_id = int(
                     get_word_ngram_id(hashes, self.buckets, self.nwords)
                 )
