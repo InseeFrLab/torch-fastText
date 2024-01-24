@@ -17,6 +17,7 @@ import pyarrow.parquet as pq
 from model import FastTextModule, FastTextModel
 from dataset import FastTextModelDataset
 from tokenizer import NGramTokenizer
+from preprocess import clean_text_feature
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
@@ -190,6 +191,8 @@ if __name__ == "__main__":
     )
     # Subset of df to keep things short
     df = df.sample(frac=0.1)
+    # Clean text feature
+    df = clean_text_feature(df)
     # Add fictitious additional variable
     df["additional_var"] = np.random.randint(0, 2, df.shape[0])
     # Encode classes
