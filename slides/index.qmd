@@ -99,6 +99,7 @@ class Model(nn.Module):
 
 ## TODOs
 
+- [**Implémentation plus naturelle**]{.orange}
 - [**Procédure d'optimisation**]{.orange}
 - [**Benchmark avec fastText**]{.orange}
 
