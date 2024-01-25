@@ -199,10 +199,10 @@ if __name__ == "__main__":
                 "train_proportion": 0.8,
                 "lr": 0.2,
                 "buckets": 2000000,
-                "dim": 50,
-                "minCount": 1,
+                "dim": 180,
+                "minCount": 3,
                 "minn": 3,
-                "maxn": 6,
+                "maxn": 4,
                 "wordNgrams": 3,
             },
         )
