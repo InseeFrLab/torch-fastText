@@ -1,0 +1,107 @@
+---
+title: Implémentation du classifieur "fastText" avec Pytorch
+author: "Tom Seimandi"
+date: "31/01/2024"
+date-format: "D MMMM YYYY"
+slide-number: true
+lang: fr-FR
+# for blind readers:
+slide-tone: false
+chalkboard: # press the B key to toggle chalkboard
+  theme: whiteboard
+# uncomment to use the multiplex mode:
+# multiplex: true
+format:
+  onyxia-revealjs:
+    output-file: index.html
+controls: true
+css: custom.css
+from: markdown+emoji
+ascii: true
+---
+
+## Contexte
+
+- Aujourd'hui, utilisation de fastText pour les applications de [**codification automatique**]{.orange} à l'Insee
+- [**Avantages**]{.orange}:
+  - Modélisation simple mais [**adaptée**]{.blue2} à la majorité des applications (libellés courts, pas de véritable langage, fautes d'orthographe)
+  - [**Rapidité**]{.blue2}
+  - Interface existante avec [**Java**]{.blue2}
+
+## Contexte
+
+- [**Inconvénients**]{.orange}:
+  - Librairie [**à peine maintenue**]{.blue2}
+  - Developpée en [**C++**]{.blue2} donc difficile à maintenir et à améliorer
+  - [**Pas d'utilitaires**]{.blue2} pour aider à l'entraînement de modèles
+  - [**Pas de flexibilité**]{.blue2} dans la modélisation
+  - Pas de prise en compte des [**variables catégorielles**]{.blue2}
+
+## Implémentation avec Pytorch
+
+![](img/diag-fasttext-torch.png)
+
+## Implémentation avec Pytorch
+
+```{python}
+#| echo: true
+#| eval: false
+
+class Model(nn.Module):
+
+    def __init__(
+        self,
+        embedding_dim: int,
+        vocab_size: int,
+        num_classes: int,
+        categorical_vocabulary_sizes: List[int],
+        padding_idx: int = 0,
+    ):
+        super(FastTextModel, self).__init__()
+        self.embeddings = nn.Embedding(
+            embedding_dim=embedding_dim,
+            num_embeddings=vocab_size,
+            padding_idx=padding_idx,
+        )
+        self.categorical_embeddings = {}
+        for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
+            self.categorical_embeddings[var_idx] = nn.Embedding(
+              embedding_dim=embedding_dim,
+              num_embeddings=vocab_size
+            )
+
+        self.fc = nn.Linear(embedding_dim, num_classes)
+
+    def forward(self, inputs: List[torch.LongTensor]) -> torch.Tensor:
+        # Token embeddings
+        x_1 = inputs[0]
+        x_1 = self.embeddings(x_1)
+
+        Categorical embeddings
+        x_cat = []
+        for var_idx, embedding_layer in self.categorical_embeddings.items():
+            x_cat.append(embedding_layer(inputs[var_idx + 1]))
+
+        # Mean of tokens
+        non_zero_tokens = x_1.sum(-1) != 0
+        non_zero_tokens = non_zero_tokens.sum(-1)
+        x_1 = x_1.sum(dim=-2)
+        x_1 /= non_zero_tokens.unsqueeze(-1)
+        x_1 = torch.nan_to_num(x_1)
+
+        # Add categorical embeddings
+        x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+
+        # Linear layer
+        z = self.fc(x_in)
+        return z
+```
+
+## TODOs
+
+- [**Procédure d'optimisation**]{.orange}
+- [**Benchmark avec fastText**]{.orange}
+
+## Ressources
+
+- [Lien vers le dépôt](https://github.com/InseeFrLab/torch-fastText)

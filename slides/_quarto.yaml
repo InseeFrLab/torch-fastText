@@ -1,0 +1,8 @@
+project:
+  output-dir: ../docs
+  render:
+    - index.qmd
+
+format:
+  onyxia-revealjs:
+    output-file: index.html
