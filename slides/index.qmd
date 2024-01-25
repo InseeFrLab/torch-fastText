@@ -1,7 +1,7 @@
 ---
-title: Implémentation du classifieur "fastText" avec Pytorch
-author: "Tom Seimandi"
-date: "31/01/2024"
+title: Implémentation du classifieur *fastText* avec Pytorch
+author: ""
+date: ""
 date-format: "D MMMM YYYY"
 slide-number: true
 lang: fr-FR
