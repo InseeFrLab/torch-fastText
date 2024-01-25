@@ -164,3 +164,6 @@ lightning_logs/
 
 # Training data
 data/training_data.txt
+
+# Docs
+docs/
