@@ -1,15 +1,15 @@
 name: torch-fastText
 
 entry_points:
-  torch:
+  main:
     parameters:
-      remote_server_uri: {type: str, default: https://user-tseimandi-597803.user.lab.sspcloud.fr}
+      remote_server_uri: {type: str, default: https://user-meilametayebjee-mlflow.user.lab.sspcloud.fr}
       experiment_name: {type: str, default: torch-fastText}
       run_name: {type: str, default: default}
     command: "python src/train.py {remote_server_uri} {experiment_name} {run_name}"
   fasttext:
     parameters:
-      remote_server_uri: {type: str, default: https://user-tseimandi-597803.user.lab.sspcloud.fr}
+      remote_server_uri: {type: str, default: https://user-meilametayebjee-mlflow.user.lab.sspcloud.fr}
       experiment_name: {type: str, default: fastText}
       run_name: {type: str, default: default}
     command: "python src/benchmark.py {remote_server_uri} {experiment_name} {run_name}"
