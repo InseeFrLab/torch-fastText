@@ -4,9 +4,14 @@ Integrates additional categorical features.
 """
 from typing import List
 import torch
+import pandas as pd
+import numpy as np
 from torchmetrics import Accuracy
 from torch import nn
 import pytorch_lightning as pl
+
+from preprocess import clean_text_feature
+
 
 
 class FastTextModel(nn.Module):
@@ -16,6 +21,8 @@ class FastTextModel(nn.Module):
 
     def __init__(
         self,
+        tokenizer,
+        nace_encoder,
         embedding_dim: int,
         vocab_size: int,
         num_classes: int,
@@ -39,6 +46,8 @@ class FastTextModel(nn.Module):
         super(FastTextModel, self).__init__()
         self.num_classes = num_classes
         self.padding_idx = padding_idx
+        self.tokenizer = tokenizer
+        self.nace_encoder = nace_encoder
 
         self.embeddings = nn.Embedding(
             embedding_dim=embedding_dim,
@@ -86,6 +95,54 @@ class FastTextModel(nn.Module):
         # Linear layer
         z = self.fc(x_in)
         return z
+    
+    def predict(self, text: List, params:dict[str, any] = None):
+        """
+        Args:
+            text (List): A list of text observations.
+            params (Optional[Dict[str, Any]]): Additional parameters to
+                pass to the model for inference.
+
+        Returns:
+            A tuple containing the k most likely codes to the query.
+        """
+        self.eval()
+        batch_size = len(text)
+        params["text"] = text
+        
+        df = pd.DataFrame(params)
+        df = clean_text_feature(df, text_feature="text") #preprocess text
+        indices_batch = [self.tokenizer.indices_matrix(sentence) for sentence in text]
+        max_tokens = max([len(indices) for indices in indices_batch])
+
+        padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
+        padded_batch = [
+            np.pad(
+                indices,
+                (0, max_tokens - len(indices)),
+                "constant",
+                constant_values=padding_index,
+            )
+            for indices in indices_batch
+        ]
+        padded_batch = np.stack(padded_batch)
+
+        # Cast
+        x = torch.LongTensor(padded_batch.astype(np.int32)).reshape(batch_size, -1)
+        other_features = []
+        for key in params.keys():
+            if key != "text":
+                print(params[key])
+                other_features.append(torch.LongTensor(params[key]).reshape(batch_size, -1))
+        
+        other_features = torch.stack(other_features).reshape(batch_size, -1)
+        input = torch.cat([x, other_features], dim = 1)
+        encoded_labels = self(input).detach().cpu().numpy()
+        return self.nace_encoder.inverse_transform(encoded_labels)
+
+
+
+
 
 
 class FastTextModule(pl.LightningModule):
@@ -210,3 +267,6 @@ class FastTextModule(pl.LightningModule):
         }
 
         return [optimizer], [scheduler]
+    
+    def predict(self, text, params):
+        return self.model.predict(text, params)

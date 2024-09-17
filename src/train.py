@@ -91,10 +91,10 @@ def train(
         tokenizer=tokenizer,
     )
     train_dataloader = train_dataset.create_dataloader(
-        batch_size=batch_size, num_workers=100
+        batch_size=batch_size, num_workers=72
     )
     val_dataloader = val_dataset.create_dataloader(
-        batch_size=batch_size, num_workers=100
+        batch_size=batch_size, num_workers=72
     )
 
     # Compute num_classes and categorical_vocabulary_sizes
@@ -104,6 +104,8 @@ def train(
     ]
     # Model
     model = FastTextModel(
+        tokenizer=tokenizer,
+        nace_encoder=encoder,
         embedding_dim=embedding_dim,
         vocab_size=buckets + tokenizer.get_nwords() + 1,
         num_classes=num_classes,
