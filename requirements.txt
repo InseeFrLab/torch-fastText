@@ -8,3 +8,13 @@ mlflow
 unidecode
 nltk
 fasttext
+torch
+pytorch_lightning
+numpy
+pandas
+scikit-learn
+pyarrow==16.1.0
+mlflow
+unidecode
+nltk
+fasttext
