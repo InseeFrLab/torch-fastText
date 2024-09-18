@@ -135,12 +135,12 @@ class NGramTokenizer:
 
         # Add word
         try:
-            tokens = [word] + tokens
             indices = [self.get_word_index(word)] + indices
+            tokens = [word] + tokens
+            
         except KeyError:
-            # print("Token was not in mapping, not adding it to subwords.")
+            #print("Token was not in mapping, not adding it to subwords.")
             pass
-
         return (tokens, indices)
 
     def indices_matrix(self, sentence: str) -> np.array:
@@ -156,9 +156,15 @@ class NGramTokenizer:
         indices = []
         words = []
         word_ngram_ids = []
+        all_tokens_id = {}
 
         for word in sentence.split(" "):
-            indices += self.get_subwords(word)[1]
+            tokens, ind = self.get_subwords(word)
+            indices += ind
+
+            for idx, tok in enumerate(tokens):
+                all_tokens_id[tok] = ind[idx]
+
             words += [word]
 
         # Adding end of string token
@@ -168,11 +174,17 @@ class NGramTokenizer:
         # Adding word n-grams
         for word_ngram_len in range(2, self.word_ngrams + 1):
             for i in range(len(words) - word_ngram_len + 1):
-                hashes = tuple(get_hash(word) for word in words[i: i + word_ngram_len])
+                gram = words[i: i + word_ngram_len]
+                gram = ' '.join(gram)
+
+                hashes = tuple(get_hash(word) for word in gram)
                 word_ngram_id = int(
                     get_word_ngram_id(hashes, self.buckets, self.nwords)
                 )
+
+                all_tokens_id[gram] = word_ngram_id
                 word_ngram_ids.append(word_ngram_id)
 
         all_indices = indices + word_ngram_ids
-        return np.asarray(all_indices)
+        id_to_token = {v: k for k, v in all_tokens_id.items()}
+        return np.asarray(all_indices), id_to_token
