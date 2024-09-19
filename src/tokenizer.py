@@ -187,4 +187,4 @@ class NGramTokenizer:
 
         all_indices = indices + word_ngram_ids
         id_to_token = {v: k for k, v in all_tokens_id.items()}
-        return np.asarray(all_indices), id_to_token
+        return np.asarray(all_indices), id_to_token, all_tokens_id
