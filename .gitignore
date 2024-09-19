@@ -167,7 +167,3 @@ data/training_data.txt
 
 # Docs
 docs/
-
-
-torch-fastText/--remote_server_uri=https:/
-src/experiments.ipynb
