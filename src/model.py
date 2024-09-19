@@ -130,7 +130,7 @@ class FastTextModel(nn.Module):
         id_to_token_dicts = []
         token_to_id_dicts = []
 
-        for sentence in text:
+        for sentence in df.text:
             all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(sentence)
             indices_batch.append(all_ind)
             id_to_token_dicts.append(id_to_token)
@@ -165,13 +165,13 @@ class FastTextModel(nn.Module):
 
         attributions = lig.attribute((x, other_features), target=pred.argmax(1)).sum(dim=-1)
         
-        top_k_indices = np.argsort(label_scores, axis = 1)[:, -top_k:]
+        top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:]
         confidence = np.take_along_axis(label_scores, top_k_indices, axis=1)
-        softmax_scores = softmax(confidence, axis  = 1).round(2)
+        softmax_scores = softmax(confidence, axis=1).round(2)
         predictions = np.empty((batch_size, top_k)).astype('str')
         for idx in range(batch_size):
             predictions[idx] = self.nace_encoder.inverse_transform(top_k_indices[idx])
-        return predictions, softmax_scores, attributions, x, id_to_token_dicts, token_to_id_dicts
+        return predictions, softmax_scores, attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
 
 class FastTextModule(pl.LightningModule):
     """

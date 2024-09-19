@@ -135,8 +135,9 @@ class NGramTokenizer:
 
         # Add word
         try:
-            indices = [self.get_word_index(word)] + indices
-            tokens = [word] + tokens
+            if word not in tokens:
+                indices = [self.get_word_index(word)] + indices
+                tokens = [word] + tokens
             
         except KeyError:
             #print("Token was not in mapping, not adding it to subwords.")
@@ -157,16 +158,14 @@ class NGramTokenizer:
         words = []
         word_ngram_ids = []
         all_tokens_id = {}
-
         for word in sentence.split(" "):
             tokens, ind = self.get_subwords(word)
             indices += ind
-
             for idx, tok in enumerate(tokens):
-                all_tokens_id[tok] = ind[idx]
+                if tok not in all_tokens_id.keys():
+                    all_tokens_id[tok] = ind[idx]
 
             words += [word]
-
         # Adding end of string token
         indices += [0]
         words += ["</s>"]
@@ -181,10 +180,11 @@ class NGramTokenizer:
                 word_ngram_id = int(
                     get_word_ngram_id(hashes, self.buckets, self.nwords)
                 )
-
                 all_tokens_id[gram] = word_ngram_id
                 word_ngram_ids.append(word_ngram_id)
 
         all_indices = indices + word_ngram_ids
-        id_to_token = {v: k for k, v in all_tokens_id.items()}
+
+        id_to_token = {v:k for k, v in all_tokens_id.items()}
+ 
         return np.asarray(all_indices), id_to_token, all_tokens_id
