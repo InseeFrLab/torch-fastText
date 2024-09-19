@@ -18,3 +18,5 @@ mlflow
 unidecode
 nltk
 fasttext
+captum
+ipywidgets
