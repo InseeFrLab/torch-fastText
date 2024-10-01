@@ -108,17 +108,21 @@ class FastTextModel(nn.Module):
         z = self.fc(x_in) #(batch_size, num_classes)
         return z
     
-    def predict(self, text: List, params:dict[str, any] = None, top_k = 1):
+    def predict(self, text: List, params:dict[str, any] = None, top_k = 1, explain = False):
         """
         Args:
             text (List): A list of text observations.
             params (Optional[Dict[str, Any]]): Additional parameters to
                 pass to the model for inference.
+            top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
+            explain (bool): launch gradient integration to have an explanation of the prediction (default: False)
 
         Returns:
             A tuple containing the k most likely codes to the query.
         """
-        lig = LayerIntegratedGradients(self, self.embeddings)
+
+        if explain:
+            lig = LayerIntegratedGradients(self, self.embeddings) # initialize a Captum layer gradient integrator
 
         self.eval()
         batch_size = len(text)
@@ -164,15 +168,21 @@ class FastTextModel(nn.Module):
         pred = self(x, other_features)
         label_scores = pred.detach().cpu().numpy()
 
-        attributions = lig.attribute((x, other_features), target=pred.argmax(1)).sum(dim=-1)
+        if explain:
+            attributions = lig.attribute((x, other_features), target=pred.argmax(1)).sum(dim=-1)
         
         top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:]
         confidence = np.take_along_axis(label_scores, top_k_indices, axis=1)
         softmax_scores = softmax(confidence, axis=1).round(2)
         predictions = np.empty((batch_size, top_k)).astype('str')
+
         for idx in range(batch_size):
             predictions[idx] = self.nace_encoder.inverse_transform(top_k_indices[idx])
-        return predictions, softmax_scores, attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
+        
+        if explain:
+            return predictions, softmax_scores, attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
+        else:
+            return predictions, softmax_scores
 
 class AttentionLayer(nn.Module):
     def __init__(self, embedding_dim):
