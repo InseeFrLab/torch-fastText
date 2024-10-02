@@ -414,7 +414,7 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Prediction.
         """
-        return self.model(inputs)
+        return self.model(inputs[0], inputs[1])
 
     def training_step(
         self, batch: List[torch.LongTensor], batch_idx: int

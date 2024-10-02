@@ -87,8 +87,9 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         ]
         y = batch[:, -1]
 
-        indices_batch = [self.tokenizer.indices_matrix(sentence) for sentence in text]
+        indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
         max_tokens = max([len(indices) for indices in indices_batch])
+
 
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
         padded_batch = [

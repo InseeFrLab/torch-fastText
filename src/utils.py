@@ -77,13 +77,25 @@ def tokenized_text_in_tokens(tokenized_text, id_to_token_dicts, padding_index=20
         for i, tokenized_sentence in enumerate(tokenized_text)
     ]
 
-# at sentence level
 def match_token_to_word(sentence, list_tokens):
+    """
+    Match each token to a list of preprocessed words, at sentence level.
+
+    Args:
+        sentence (str): Sentence.
+        list_tokens (List[str]): List of tokens (in string form).
+    
+    Returns:
+        Dict[str, List[str]]: Mapping from token to list of preprocessed words.
+    """
+
     words = sentence.split()
 
     # preprocess tokens
     token_to_word = {}
     for token in list_tokens:
+
+        #Preprocess token itself
         preprocessed_token = token.replace('</s>', '')
         preprocessed_token = preprocessed_token.replace('<', '')
         preprocessed_token = preprocessed_token.replace('>', '')
@@ -91,6 +103,7 @@ def match_token_to_word(sentence, list_tokens):
         preprocessed_token = preprocessed_token.split()
         matching_words = []
         for i, tok in enumerate(preprocessed_token):
+            # Find all the preprocessed words that contain the token
             matching_word = next((word for word in words if tok in word), None)
             matching_words.append(matching_word)
         token_to_word[token] = matching_words
@@ -100,6 +113,22 @@ def match_token_to_word(sentence, list_tokens):
 # at text level
 def compute_word_score(text, tokenized_text, scores, id_to_token_dicts, token_to_id_dicts, 
                        padding_index=2009603, end_of_string_index=0):
+
+    """
+    Compute preprocessed word scores based on token scores.
+
+    Args:
+        text (List[str]): List of sentences.
+        tokenized_text (List[List[int]]): For each sentence, list of token IDs.
+        scores (List[torch.Tensor]): For each sentence, list of token scores.
+        id_to_token_dicts (List[Dict[int, str]]): For each sentence, mapping from token ID to token in string form.
+        token_to_id_dicts (List[Dict[str, int]]): For each sentence, mapping from token (string) to token ID.
+        padding_index (int): Index of padding token.
+        end_of_string_index (int): Index of end of string token.
+
+    Returns:
+        List[Dict[str, float]]: For each sentence, mapping from preprocessed word to score.
+    """
     
     # Convert token IDs to tokens
     tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
@@ -107,12 +136,14 @@ def compute_word_score(text, tokenized_text, scores, id_to_token_dicts, token_to
     word_to_score_dicts = []
     
     for idx, sentence in enumerate(text):
-        tokenized_sentence_tokens = tokenized_text_tokens[idx]
-        token_to_word = match_token_to_word(sentence, tokenized_sentence_tokens)
+        tokenized_sentence_tokens = tokenized_text_tokens[idx] # sentence level, List[str]
 
-        id_to_token = id_to_token_dicts[idx]
-        score_sentence = scores[idx]
-        tokenized_sentence = tokenized_text[idx]
+        # Match each token to a list preprocessed words
+        token_to_word = match_token_to_word(sentence, tokenized_sentence_tokens) # Dict[str, List[str]]
+
+        id_to_token = id_to_token_dicts[idx] # Dict[int, str]
+        score_sentence = scores[idx] # torch.Tensor, token scores
+        tokenized_sentence = tokenized_text[idx] # torch.Tensor
 
         # Initialize word-to-score dictionary with zero values
         word_to_score = {word: 0 for word in sentence.split()}

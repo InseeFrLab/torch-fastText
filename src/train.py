@@ -169,10 +169,12 @@ def train(
     )
 
     # Training
-    mlflow.autolog()
+    mlflow.pytorch.autolog()
     torch.cuda.empty_cache()
     torch.set_float32_matmul_precision("medium")
     trainer.fit(module, train_dataloader, val_dataloader)
+
+    return trainer, module
 
 
 if __name__ == "__main__":
@@ -209,13 +211,13 @@ if __name__ == "__main__":
     mlflow.set_tracking_uri(remote_server_uri)
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run(run_name=run_name):
-        train(
+        trainer, light_module = train(
             df=df,
             y="nace",
             text_feature="text",
             categorical_features=["additional_var"],
             params={
-                "max_epochs": 50,
+                "max_epochs": 1,
                 "patience": 3,
                 "train_proportion": 0.8,
                 "batch_size": 256,
@@ -228,4 +230,19 @@ if __name__ == "__main__":
                 "wordNgrams": 3,
                 "sparse": False,
             },
+        )
+        best_model = type(light_module).load_from_checkpoint(
+            checkpoint_path=trainer.checkpoint_callback.best_model_path,
+            model=light_module.model,
+            loss=light_module.loss,
+            optimizer=light_module.optimizer,
+            optimizer_params=light_module.optimizer_params,
+            scheduler=light_module.scheduler,
+            scheduler_params=light_module.scheduler_params,
+            scheduler_interval=light_module.scheduler_interval,
+        )
+        mlflow.pytorch.log_model(
+            artifact_path="model",
+            code_paths=["src/"],
+            pytorch_model=best_model.to("cpu")
         )
