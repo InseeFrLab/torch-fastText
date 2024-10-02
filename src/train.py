@@ -172,7 +172,7 @@ def train(
     )
 
     # Training
-    mlflow.pytorch.autolog()
+    #mlflow.pytorch.autolog()
     torch.cuda.empty_cache()
     torch.set_float32_matmul_precision("medium")
     #trainer.fit(module, train_dataloader, val_dataloader)
