@@ -4,7 +4,7 @@ Dataset class for a FastTextModel without the fastText dependency.
 from typing import List, Tuple
 import torch
 import numpy as np
-from tokenizer import NGramTokenizer
+from tokenizer.tokenizer import NGramTokenizer
 
 
 class FastTextModelDataset(torch.utils.data.Dataset):

@@ -3,7 +3,7 @@ NGramTokenizer class.
 """
 import numpy as np
 from typing import List, Tuple
-from utils import get_hash, get_word_ngram_id
+from tokenizer.utils import get_hash, get_word_ngram_id
 
 
 class NGramTokenizer:

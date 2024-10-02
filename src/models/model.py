@@ -4,6 +4,7 @@ Integrates additional categorical features.
 """
 from typing import List
 import torch
+import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 from torchmetrics import Accuracy
@@ -12,8 +13,7 @@ import pytorch_lightning as pl
 from scipy.special import softmax
 from captum.attr import IntegratedGradients, LayerIntegratedGradients
 
-from preprocess import clean_text_feature
-import torch.nn.functional as F
+from config.preprocess import clean_text_feature
 
 
 
@@ -486,3 +486,4 @@ class FastTextModule(pl.LightningModule):
         }
 
         return [optimizer], [scheduler]
+

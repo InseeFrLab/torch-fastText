@@ -15,15 +15,18 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import mlflow
 import pyarrow.parquet as pq
-from model import FastTextModule, FastTextModel
-from dataset import FastTextModelDataset
-from tokenizer import NGramTokenizer
-from preprocess import clean_text_feature
+
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
 )
+
+
+from config.preprocess import clean_text_feature
+from config.dataset import FastTextModelDataset
+from tokenizer.tokenizer import NGramTokenizer
+from models.model import FastTextModule, FastTextModel
 
 
 def train(
@@ -172,7 +175,7 @@ def train(
     mlflow.pytorch.autolog()
     torch.cuda.empty_cache()
     torch.set_float32_matmul_precision("medium")
-    trainer.fit(module, train_dataloader, val_dataloader)
+    #trainer.fit(module, train_dataloader, val_dataloader)
 
     return trainer, module
 
@@ -232,7 +235,8 @@ if __name__ == "__main__":
             },
         )
         best_model = type(light_module).load_from_checkpoint(
-            checkpoint_path=trainer.checkpoint_callback.best_model_path,
+            #checkpoint_path=trainer.checkpoint_callback.best_model_path,
+            checkpoint_path="lightning_logs/version_0/checkpoints/epoch=0-step=265.ckpt",
             model=light_module.model,
             loss=light_module.loss,
             optimizer=light_module.optimizer,
@@ -243,6 +247,6 @@ if __name__ == "__main__":
         )
         mlflow.pytorch.log_model(
             artifact_path="model",
-            code_paths=["src/"],
+            code_paths=["src/models/", "src/config/",  "src/explainability/", "src/tokenizer/"],
             pytorch_model=best_model.to("cpu")
         )
