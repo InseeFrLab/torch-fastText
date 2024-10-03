@@ -172,10 +172,10 @@ def train(
     )
 
     # Training
-    #mlflow.pytorch.autolog()
+    mlflow.pytorch.autolog()
     torch.cuda.empty_cache()
     torch.set_float32_matmul_precision("medium")
-    #trainer.fit(module, train_dataloader, val_dataloader)
+    trainer.fit(module, train_dataloader, val_dataloader)
 
     return trainer, module
 
@@ -235,8 +235,7 @@ if __name__ == "__main__":
             },
         )
         best_model = type(light_module).load_from_checkpoint(
-            #checkpoint_path=trainer.checkpoint_callback.best_model_path,
-            checkpoint_path="lightning_logs/version_0/checkpoints/epoch=0-step=265.ckpt",
+            checkpoint_path=trainer.checkpoint_callback.best_model_path,
             model=light_module.model,
             loss=light_module.loss,
             optimizer=light_module.optimizer,

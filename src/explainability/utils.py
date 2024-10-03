@@ -5,6 +5,7 @@ import ctypes
 from typing import Tuple
 from scipy.special import softmax
 import numpy as np
+import difflib
 
 def get_top_tokens(text, tokenized_text, id_to_token_dicts, attr, top_k=5, padding_index=2009603, end_of_string_index = 0):
 
@@ -71,15 +72,43 @@ def match_token_to_word(sentence, list_tokens):
     return token_to_word
 
 
+def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
+    # For each word in the original list, find the n closest matching processed words
+    word_mapping = {}
+
+    for original_word in original_words:
+        processed_word_scores = []
+
+        # Calculate the similarity score for each processed word with the current original word
+        for processed_word in processed_words:
+            similarity_score = difflib.SequenceMatcher(None, processed_word, original_word).ratio()
+
+            # Only consider matches with similarity above the cutoff
+            if similarity_score >= cutoff:
+                processed_word_scores.append((processed_word, similarity_score))
+        
+        # Sort processed words by similarity score in descending order
+        processed_word_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # Extract the n closest processed words and their similarity scores
+        closest_words = [item[0] for item in processed_word_scores[:n]]
+        similarity_scores = [item[1] for item in processed_word_scores[:n]]
+
+        # Add the tuple (list of closest words, list of similarity scores) to the mapping
+        word_mapping[original_word] = (closest_words, similarity_scores)
+
+    return word_mapping
+
+
 # at text level
-def compute_word_score(text, tokenized_text, scores, id_to_token_dicts, token_to_id_dicts, 
-                       padding_index=2009603, end_of_string_index=0):
+def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, scores, id_to_token_dicts, token_to_id_dicts, 
+                        padding_index=2009603, end_of_string_index=0):
 
     """
     Compute preprocessed word scores based on token scores.
 
     Args:
-        text (List[str]): List of sentences.
+        preprocessed_text (List[str]): List of preprocessed sentences.
         tokenized_text (List[List[int]]): For each sentence, list of token IDs.
         scores (List[torch.Tensor]): For each sentence, list of token scores.
         id_to_token_dicts (List[Dict[int, str]]): For each sentence, mapping from token ID to token in string form.
@@ -96,7 +125,7 @@ def compute_word_score(text, tokenized_text, scores, id_to_token_dicts, token_to
     
     word_to_score_dicts = []
     
-    for idx, sentence in enumerate(text):
+    for idx, sentence in enumerate(preprocessed_text):
         tokenized_sentence_tokens = tokenized_text_tokens[idx] # sentence level, List[str]
 
         # Match each token to a list preprocessed words
@@ -124,6 +153,7 @@ def compute_word_score(text, tokenized_text, scores, id_to_token_dicts, token_to
         values = np.array(list(word_to_score.values()), dtype=float)
         softmax_values = np.round(softmax(values), 3)
         word_to_score.update({word: float(softmax_value) 
-                              for word, softmax_value in zip(word_to_score.keys(), softmax_values)})
+                                for word, softmax_value in zip(word_to_score.keys(), 
+                                softmax_values)})
 
     return word_to_score_dicts

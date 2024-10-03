@@ -14,6 +14,8 @@ from scipy.special import softmax
 from captum.attr import IntegratedGradients, LayerIntegratedGradients
 
 from config.preprocess import clean_text_feature
+from explainability.utils import match_token_to_word, tokenized_text_in_tokens, \
+                                 map_processed_to_original, compute_preprocessed_word_score
 
 
 
@@ -183,6 +185,40 @@ class FastTextModel(nn.Module):
             return predictions, softmax_scores, attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
         else:
             return predictions, softmax_scores
+
+    def predict_and_explain(self, text, params, n=5, cutoff=0.75):
+        pred, confidence, attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
+            = self.predict(text=text, params=params, top_k=1, explain=True)
+
+        word_to_score_dicts = compute_preprocessed_word_score(self, processed_text, tokenized_text,
+                            attr, id_to_token_dicts, token_to_id_dicts,
+                            padding_index=2009603, end_of_string_index=0)
+
+        all_scores = []
+        for idx, word_to_score in enumerate(word_to_score_dicts):
+            processed_words = list(word_to_score.keys())
+            original_words = text[idx].split()        
+
+            for i, word in enumerate(original_words):
+                original_words[i] = word.replace(',', '')
+                
+            mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
+
+            scores = {}
+            for word in original_words:
+                processed_words, distances = mapping[word]
+                word_score = 0
+                for i, potential_processed_word in enumerate(processed_words):
+                    score = word_to_score[potential_processed_word]
+                    word_score += score * distances[i] / np.sum(distances)
+
+                scores[word] = word_score
+
+            all_scores.append(scores)
+
+        return pred, confidence, all_scores
+        
+
 
 class AttentionLayer(nn.Module):
     def __init__(self, embedding_dim):
