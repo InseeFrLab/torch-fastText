@@ -5,7 +5,7 @@ from explainability.utils import map_processed_to_original
 
 def visualize_word_scores(all_scores, original_texts, n=5, cutoff=0.75):
     for idx, word_to_score in enumerate(all_scores):
-        scores = list(all_scores[idx].values())
+        scores = all_scores[idx]
         original_words = original_texts[idx].split()
         for i, word in enumerate(original_words):
             original_words[i] = word.replace(',', '')

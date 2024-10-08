@@ -102,6 +102,7 @@ class FastTextModel(nn.Module):
         x_1 = x_1.sum(dim=-2)
         x_1 /= non_zero_tokens.unsqueeze(-1)
         x_1 = torch.nan_to_num(x_1) # (batch_size, embedding_dim)
+        
         # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
         x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0) 
         
@@ -204,7 +205,7 @@ class FastTextModel(nn.Module):
                 
             mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
 
-            scores = {}
+            scores = []
             for word in original_words:
                 processed_words, distances = mapping[word]
                 word_score = 0
@@ -212,7 +213,7 @@ class FastTextModel(nn.Module):
                     score = word_to_score[potential_processed_word]
                     word_score += score * distances[i] / np.sum(distances)
 
-                scores[word] = word_score
+                scores.append(word_score)
 
             all_scores.append(scores)
 
