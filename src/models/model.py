@@ -214,7 +214,7 @@ class FastTextModel(nn.Module):
                     word_score += score * distances[i] / np.sum(distances)
 
                 scores.append(word_score)
-
+            scores = scores / np.sum(scores)
             all_scores.append(scores)
 
         return pred, confidence, all_scores

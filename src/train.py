@@ -220,7 +220,7 @@ if __name__ == "__main__":
             text_feature="text",
             categorical_features=["additional_var"],
             params={
-                "max_epochs": 1,
+                "max_epochs": 5,
                 "patience": 3,
                 "train_proportion": 0.8,
                 "batch_size": 256,

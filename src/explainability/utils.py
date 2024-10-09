@@ -32,12 +32,22 @@ def get_top_tokens(text, tokenized_text, id_to_token_dicts, attr, top_k=5, paddi
 def tokenized_text_in_tokens(tokenized_text, id_to_token_dicts, padding_index=2009603, end_of_string_index = 0):
     return [
         [
-            id_to_token_dicts[i][token_id.item()] 
+            id_to_token_dicts[i][token_id.item()]
             for token_id in tokenized_sentence
             if token_id.item() not in {padding_index, end_of_string_index}
         ]
         for i, tokenized_sentence in enumerate(tokenized_text)
     ]
+
+def preprocess_token(token):
+    preprocessed_token = token.replace('</s>', '')
+    preprocessed_token = preprocessed_token.replace('<', '')
+    preprocessed_token = preprocessed_token.replace('>', '')
+
+    preprocessed_token = preprocessed_token.split()
+
+    return preprocessed_token
+
 
 def match_token_to_word(sentence, list_tokens):
     """
@@ -56,13 +66,9 @@ def match_token_to_word(sentence, list_tokens):
     # preprocess tokens
     token_to_word = {}
     for token in list_tokens:
-
         #Preprocess token itself
-        preprocessed_token = token.replace('</s>', '')
-        preprocessed_token = preprocessed_token.replace('<', '')
-        preprocessed_token = preprocessed_token.replace('>', '')
+        preprocessed_token = preprocess_token(token)
 
-        preprocessed_token = preprocessed_token.split()
         matching_words = []
         for i, tok in enumerate(preprocessed_token):
             # Find all the preprocessed words that contain the token
@@ -102,7 +108,7 @@ def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
 
 # at text level
 def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, scores, id_to_token_dicts, token_to_id_dicts, 
-                        padding_index=2009603, end_of_string_index=0):
+                        padding_index=2009603, end_of_string_index=0, aggregate=True):
 
     """
     Compute preprocessed word scores based on token scores.
@@ -115,6 +121,7 @@ def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, sco
         token_to_id_dicts (List[Dict[str, int]]): For each sentence, mapping from token (string) to token ID.
         padding_index (int): Index of padding token.
         end_of_string_index (int): Index of end of string token.
+        aggregate (bool): Whether to aggregate scores at word level (if False, stay at token level).
 
     Returns:
         List[Dict[str, float]]: For each sentence, mapping from preprocessed word to score.
@@ -122,6 +129,9 @@ def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, sco
     
     # Convert token IDs to tokens
     tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
+
+    if not aggregate:
+        return tokenized_text_tokens
     
     word_to_score_dicts = []
     
@@ -147,13 +157,5 @@ def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, sco
                     word_to_score[word] += score.item()
 
         word_to_score_dicts.append(word_to_score)
-
-    # Apply softmax and format the scores
-    for word_to_score in word_to_score_dicts:
-        values = np.array(list(word_to_score.values()), dtype=float)
-        softmax_values = np.round(softmax(values), 3)
-        word_to_score.update({word: float(softmax_value) 
-                                for word, softmax_value in zip(word_to_score.keys(), 
-                                softmax_values)})
 
     return word_to_score_dicts
