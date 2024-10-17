@@ -80,8 +80,11 @@ class FastTextModel(nn.Module):
         x_1 = x_1.sum(dim=-2)
         x_1 /= non_zero_tokens.unsqueeze(-1)
         x_1 = torch.nan_to_num(x_1)
-
-        x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+        
+        if x_cat != []:
+            x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+        else:
+            x_in = x_1
 
         # Linear layer
         z = self.fc(x_in)
