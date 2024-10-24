@@ -107,13 +107,14 @@ def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
 
 
 # at text level
-def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, scores, id_to_token_dicts, token_to_id_dicts, 
+def compute_preprocessed_word_score(preprocessed_text, tokenized_text, scores, id_to_token_dicts, token_to_id_dicts, 
                         padding_index=2009603, end_of_string_index=0, aggregate=True):
 
     """
     Compute preprocessed word scores based on token scores.
 
     Args:
+        model (torch.nn.Module): FastText Model.
         preprocessed_text (List[str]): List of preprocessed sentences.
         tokenized_text (List[List[int]]): For each sentence, list of token IDs.
         scores (List[torch.Tensor]): For each sentence, list of token scores.
@@ -136,28 +137,70 @@ def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, sco
     word_to_score_dicts = []
     
     for idx, sentence in enumerate(preprocessed_text):
-        tokenized_sentence_tokens = tokenized_text_tokens[idx] # sentence level, List[str]
+        tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
 
         # Match each token to a list preprocessed words
         token_to_word = match_token_to_word(sentence, tokenized_sentence_tokens) # Dict[str, List[str]]
 
-        id_to_token = id_to_token_dicts[idx] # Dict[int, str]
-        score_sentence = scores[idx] # torch.Tensor, token scores
-        tokenized_sentence = tokenized_text[idx] # torch.Tensor
+        id_to_token = id_to_token_dicts[idx]  # Dict[int, str]
+        score_sentence_topk = scores[idx]  # torch.Tensor, token scores, (top_k, seq_len)
+        tokenized_sentence = tokenized_text[idx]  # torch.Tensor
 
-        # Initialize word-to-score dictionary with zero values
-        word_to_score = {word: 0 for word in sentence.split()}
 
         # Calculate the score for each token and map to words
-        for token_id, score in zip(tokenized_sentence, score_sentence):
-            token_id = token_id.item()
-            if token_id not in {padding_index, end_of_string_index}:
-                token = id_to_token[token_id]
-                for word in token_to_word[token]:
-                    word_to_score[word] += score.item()
+        word_to_score_topk = []
+        for k in range(len(score_sentence_topk)):
 
-        word_to_score.values = softmax(list(word_to_score.values()))
+            # Initialize word-to-score dictionary with zero values
+            word_to_score = {word: 0 for word in sentence.split()}
 
-        word_to_score_dicts.append(word_to_score)
+            score_sentence = score_sentence_topk[k]
+            for token_id, score in zip(tokenized_sentence, score_sentence):
+                token_id = token_id.item()
+                if token_id not in {padding_index, end_of_string_index}:
+                    token = id_to_token[token_id]
+                    for word in token_to_word[token]:
+                        word_to_score[word] += score.item()
+            word_to_score_topk.append(word_to_score.copy())
+
+        word_to_score_dicts.append(word_to_score_topk)
+    
+    # Apply softmax and format the scores
+    for word_to_score_topk in word_to_score_dicts:
+        for word_to_score in word_to_score_topk:
+            values = np.array(list(word_to_score.values()), dtype=float)
+            softmax_values = np.round(softmax(values), 3)
+            word_to_score.update({word: float(softmax_value) 
+                                 for word, softmax_value in zip(word_to_score.keys(),
+                                 softmax_values)})
 
     return word_to_score_dicts
+
+def compute_word_score(word_to_score_dicts, text,  n=5, cutoff=0.75):
+
+    full_all_scores = []
+    for idx, word_to_score_topk in enumerate(word_to_score_dicts):
+        all_scores_topk = []
+        for word_to_score in word_to_score_topk:
+            processed_words = list(word_to_score.keys())
+            original_words = text[idx].split()        
+
+            for i, word in enumerate(original_words):
+                original_words[i] = word.replace(',', '')
+      
+            mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
+
+            scores = []
+            for word in original_words:
+                processed_words, distances = mapping[word]
+                word_score = 0
+                for i, potential_processed_word in enumerate(processed_words):
+                    score = word_to_score[potential_processed_word]
+                    word_score += score * distances[i] / np.sum(distances)
+
+                scores.append(word_score)
+
+            all_scores_topk.append(scores)
+        full_all_scores.append(all_scores_topk)
+
+    return full_all_scores
