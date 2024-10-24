@@ -79,6 +79,19 @@ def match_token_to_word(sentence, list_tokens):
 
 
 def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
+    """
+    Map processed words to original words based on similarity scores.
+
+    Args:
+        processed_words (List[str]): List of processed words.
+        original_words (List[str]): List of original words.
+        n (int): Number of closest processed words to consider for a given original word.
+        cutoff (float): Minimum similarity score for a match.
+    
+    Returns:
+        Dict[str, Tuple[List[str], List[float]]]: Mapping from original word to tuple of closest processed words and similarity scores.
+    """
+
     # For each word in the original list, find the n closest matching processed words
     word_mapping = {}
 
@@ -87,7 +100,7 @@ def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
 
         # Calculate the similarity score for each processed word with the current original word
         for processed_word in processed_words:
-            similarity_score = difflib.SequenceMatcher(None, processed_word, original_word).ratio()
+            similarity_score = difflib.SequenceMatcher(None, processed_word, original_word).ratio() # Ratcliff-Obershelp algorithm
 
             # Only consider matches with similarity above the cutoff
             if similarity_score >= cutoff:
@@ -114,7 +127,6 @@ def compute_preprocessed_word_score(preprocessed_text, tokenized_text, scores, i
     Compute preprocessed word scores based on token scores.
 
     Args:
-        model (torch.nn.Module): FastText Model.
         preprocessed_text (List[str]): List of preprocessed sentences.
         tokenized_text (List[List[int]]): For each sentence, list of token IDs.
         scores (List[torch.Tensor]): For each sentence, list of token scores.
@@ -166,29 +178,41 @@ def compute_preprocessed_word_score(preprocessed_text, tokenized_text, scores, i
         word_to_score_dicts.append(word_to_score_topk)
     
     # Apply softmax and format the scores
-    for word_to_score_topk in word_to_score_dicts:
-        for word_to_score in word_to_score_topk:
-            values = np.array(list(word_to_score.values()), dtype=float)
-            softmax_values = np.round(softmax(values), 3)
-            word_to_score.update({word: float(softmax_value) 
-                                 for word, softmax_value in zip(word_to_score.keys(),
-                                 softmax_values)})
+    # for word_to_score_topk in word_to_score_dicts:
+    #     for word_to_score in word_to_score_topk:
+    #         values = np.array(list(word_to_score.values()), dtype=float)
+    #         softmax_values = np.round(softmax(values), 3)
+    #         word_to_score.update({word: float(softmax_value) 
+    #                              for word, softmax_value in zip(word_to_score.keys(),
+    #                              softmax_values)})
 
     return word_to_score_dicts
 
 def compute_word_score(word_to_score_dicts, text,  n=5, cutoff=0.75):
+    """
+    Compute word scores based on preprocessed word scores.
+
+    Args:
+        word_to_score_dicts (List[List[Dict[str, float]]]): For each sentence, list of top_k mappings from preprocessed word to score.
+        text (List[str]): List of sentences.
+        n (int): Number of closest preprocessed words to consider for a given original word.
+        cutoff (float): Minimum similarity score for a match.
+    
+    Returns:
+        List[List[List[float]]]: For each sentence, list of top-k scores for each word.
+    """
 
     full_all_scores = []
-    for idx, word_to_score_topk in enumerate(word_to_score_dicts):
-        all_scores_topk = []
-        for word_to_score in word_to_score_topk:
+    for idx, word_to_score_topk in enumerate(word_to_score_dicts): # iteration over sentences
+        all_scores_topk = [] 
+        for word_to_score in word_to_score_topk: # iteration over top_k (the preds)
             processed_words = list(word_to_score.keys())
             original_words = text[idx].split()        
 
             for i, word in enumerate(original_words):
                 original_words[i] = word.replace(',', '')
       
-            mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
+            mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff) # Dict[str, Tuple[List[str], List[float]]]
 
             scores = []
             for word in original_words:
@@ -196,11 +220,14 @@ def compute_word_score(word_to_score_dicts, text,  n=5, cutoff=0.75):
                 word_score = 0
                 for i, potential_processed_word in enumerate(processed_words):
                     score = word_to_score[potential_processed_word]
-                    word_score += score * distances[i] / np.sum(distances)
+                    word_score += score * distances[i] / np.sum(distances) # weighted average (weights = similarity scores)
 
                 scores.append(word_score)
 
-            all_scores_topk.append(scores)
-        full_all_scores.append(all_scores_topk)
+            scores = softmax(scores) # softmax normalization. Length = len(original_words)
+
+            all_scores_topk.append(scores) # length top_k
+
+        full_all_scores.append(all_scores_topk) # length = len(text)
 
     return full_all_scores

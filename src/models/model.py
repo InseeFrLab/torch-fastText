@@ -124,7 +124,17 @@ class FastTextModel(nn.Module):
             explain (bool): launch gradient integration to have an explanation of the prediction (default: False)
 
         Returns:
-            A tuple containing the k most likely codes to the query.
+        if explain is False:
+            predictions (np.ndarray): A numpy array containing the top_k most likely codes to the query.
+            confidence (np.ndarray): A numpy array containing the corresponding confidence scores.
+        if explain is True:
+            predictions (np.ndarray, shape (len(text), top_k)): Containing the top_k most likely codes to the query.
+            confidence (np.ndarray, shape (len(text), top_k)): Corresponding confidence scores.
+            all_attributions (torch.Tensor, shape (len(text), top_k, seq_len)): A tensor containing the attributions for each token in the text.
+            x (torch.Tensor): A tensor containing the token indices of the text.
+            id_to_token_dicts (List[Dict[int, str]]): A list of dictionaries mapping token indices to tokens (one for each sentence).
+            token_to_id_dicts (List[Dict[str, int]]): A list of dictionaries mapping tokens to token indices: the reverse of those in id_to_token_dicts.
+            df.text (pd.Series): A pandas Series containing the preprocessed text (one line for each sentence).
         """
 
         if explain:
@@ -161,9 +171,7 @@ class FastTextModel(nn.Module):
         ]
         padded_batch = np.stack(padded_batch)
         
-
-        # Cast
-        x = torch.LongTensor(padded_batch.astype(np.int32)).reshape(batch_size, -1)
+        x = torch.LongTensor(padded_batch.astype(np.int32)).reshape(batch_size, -1) # (batch_size, seq_len) - Tokenized (int) + padded text
         other_features = []
         for key in params.keys():
             if key != "text":
@@ -173,37 +181,55 @@ class FastTextModel(nn.Module):
 
         pred = self(x, other_features) # forward pass, contains the prediction scores (len(text), num_classes)
         label_scores = pred.detach().cpu().numpy()
-        top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:]
+        top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:] 
 
         if explain:
             all_attributions = []
             for k in range(top_k):
-                attributions = lig.attribute((x, other_features), target=torch.Tensor(top_k_indices[:, k]).long()).sum(dim=-1)
+                attributions = lig.attribute((x, other_features), target=torch.Tensor(top_k_indices[:, k]).long()).sum(dim=-1) # (batch_size, seq_len)
                 all_attributions.append(attributions.detach().cpu())
+            all_attributions = torch.stack(all_attributions, dim = 1) # (batch_size, top_k, seq_len)
 
-        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(2)
+        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(2) # get the top_k most likely predictions
         predictions = np.empty((batch_size, top_k)).astype('str')
 
         for idx in range(batch_size):
-            predictions[idx] = self.nace_encoder.inverse_transform(top_k_indices[idx])
+            predictions[idx] = self.nace_encoder.inverse_transform(top_k_indices[idx]) # convert the indices to the corresponding NACE codes (str)
         
         if explain:
-            all_attributions = torch.stack(all_attributions).transpose(0, 1)
+            
             return predictions, confidence, all_attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
         else:
             return predictions, confidence
 
     def predict_and_explain(self, text, params, top_k=1, n=5, cutoff=0.75):
+        """
+        Args:
+            text (List[str]): A list of sentences.
+            params (Optional[Dict[str, Any]]): Additional parameters to
+                pass to the model for inference.
+            top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
+            n (int): mapping processed to original words: max number of candidate processed words to consider per original word (default: 5)
+            cutoff (float): mapping processed to original words: minimum similarity score to consider a candidate processed word (default: 0.75)
+        
+        Returns:
+            predictions (np.ndarray): A numpy array containing the top_k most likely codes to the query.
+            confidence (np.ndarray): A numpy array containing the corresponding confidence scores.
+            all_scores (List[List[List[float]]]): For each sentence, list of the top_k lists of attributions for each word in the sentence (one for each pred).
+        """
+
+        # Step 1: Get the predictions, confidence scores and attributions at token level
         pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
             = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
+        # Step 2: Map the attributions at token level to the processed words
         processed_word_to_score_dicts = compute_preprocessed_word_score(
                             processed_text, tokenized_text,
                             all_attr, id_to_token_dicts, token_to_id_dicts,
                             padding_index=2009603, end_of_string_index=0
                             )
-
-        all_scores = compute_word_score(processed_word_to_score_dicts, text, n=n, cutoff=cutoff)
+        # Step 3: Map the processed words to the original words
+        all_scores = compute_word_score(processed_word_to_score_dicts, text, n=n, cutoff=cutoff) # 
 
         return pred, confidence, all_scores
 
