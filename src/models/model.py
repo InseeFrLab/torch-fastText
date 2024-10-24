@@ -75,28 +75,30 @@ class FastTextModel(nn.Module):
         Forward method.
 
         Args:
-            inputs (List[torch.LongTensor]): Model inputs.
+            encoded_text (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized + padded text (in integer (indices))
+            additional_inputs (torch.Tensor[Long]): Additional categorical features.
 
         Returns:
-            torch.Tensor: Model output.
+            torch.Tensor: Model output: score for each class.
         """
-        # Embed tokens
 
-        x_1 = encoded_text # text list, of length batch_size
+
+        x_1 = encoded_text
 
         if x_1.dtype != torch.long:
             x_1 = x_1.long()
 
-
+        # Embed tokens
         x_1 = self.embeddings(x_1) # (batch_size, seq_len, embedding_dim)
 
+        # Embed categorical variables
         x_cat = []
         for i, (variable, embedding_layer) in enumerate(
             self.categorical_embeddings.items()
         ):
             x_cat.append(embedding_layer(additional_inputs[i].long()).squeeze())
 
-        # Aggregating the embeddings of each sequence 
+        # Aggregating (via averaging) the embeddings of each sequence 
         non_zero_tokens = x_1.sum(-1) != 0
         non_zero_tokens = non_zero_tokens.sum(-1)
         x_1 = x_1.sum(dim=-2)
@@ -111,10 +113,10 @@ class FastTextModel(nn.Module):
         z = self.fc(x_in) #(batch_size, num_classes)
         return z
     
-    def predict(self, text: List, params:dict[str, any] = None, top_k = 1, explain = False):
+    def predict(self, text: List[str], params:dict[str, any] = None, top_k = 1, explain = False):
         """
         Args:
-            text (List): A list of text observations.
+            text (List[str]): A list of text observations.
             params (Optional[Dict[str, Any]]): Additional parameters to
                 pass to the model for inference.
             top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
@@ -139,14 +141,14 @@ class FastTextModel(nn.Module):
         token_to_id_dicts = []
 
         for sentence in df.text:
-            all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(sentence)
+            all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(sentence) # tokenize and convert to token indices
             indices_batch.append(all_ind)
             id_to_token_dicts.append(id_to_token)
             token_to_id_dicts.append(token_to_id)
 
         max_tokens = max([len(indices) for indices in indices_batch])
 
-        padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
+        padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords() # padding index, the integer value of the padding token
         padded_batch = [
             np.pad(
                 indices,
@@ -168,24 +170,24 @@ class FastTextModel(nn.Module):
         
         other_features = torch.stack(other_features).reshape(batch_size, -1).long()
 
-        pred = self(x, other_features)
+        pred = self(x, other_features) # forward pass, contains the prediction scores (len(text), num_classes)
         label_scores = pred.detach().cpu().numpy()
 
         if explain:
             attributions = lig.attribute((x, other_features), target=pred.argmax(1)).sum(dim=-1)
         
         top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:]
-        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1)
-        softmax_scores = softmax(confidence, axis=1).round(2)
+        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(2)
+        print("confidence", confidence)
         predictions = np.empty((batch_size, top_k)).astype('str')
 
         for idx in range(batch_size):
             predictions[idx] = self.nace_encoder.inverse_transform(top_k_indices[idx])
         
         if explain:
-            return predictions, softmax_scores, attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
+            return predictions, confidence, attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
         else:
-            return predictions, softmax_scores
+            return predictions, confidence
 
     def predict_and_explain(self, text, params, n=5, cutoff=0.75):
         pred, confidence, attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
@@ -214,7 +216,7 @@ class FastTextModel(nn.Module):
                     word_score += score * distances[i] / np.sum(distances)
 
                 scores.append(word_score)
-            scores = scores / np.sum(scores)
+            scores = softmax(scores).round(2)
             all_scores.append(scores)
 
         return pred, confidence, all_scores

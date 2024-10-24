@@ -156,6 +156,8 @@ def compute_preprocessed_word_score(self, preprocessed_text, tokenized_text, sco
                 for word in token_to_word[token]:
                     word_to_score[word] += score.item()
 
+        word_to_score.values = softmax(list(word_to_score.values()))
+
         word_to_score_dicts.append(word_to_score)
 
     return word_to_score_dicts
