@@ -20,3 +20,4 @@ nltk
 fasttext
 captum
 ipywidgets
+seaborn
