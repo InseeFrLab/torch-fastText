@@ -202,7 +202,7 @@ class FastTextModel(nn.Module):
         else:
             return predictions, confidence
 
-    def predict_and_explain(self, text, params, top_k=1, n=5, cutoff=0.75):
+    def predict_and_explain(self, text, params, top_k=1, n=5, cutoff=0.65):
         """
         Args:
             text (List[str]): A list of sentences.
@@ -222,6 +222,8 @@ class FastTextModel(nn.Module):
         pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
             = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
+
+
         # Step 2: Map the attributions at token level to the processed words
         processed_word_to_score_dicts = compute_preprocessed_word_score(
                             processed_text, tokenized_text,
@@ -233,6 +235,45 @@ class FastTextModel(nn.Module):
 
         return pred, confidence, all_scores
 
+    def predict_and_explain_continuous(self, text, params, top_k=1, n=5, cutoff=0.65):
+
+        pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
+            = self.predict(text=text, params=params, top_k=top_k, explain=True)
+
+
+        tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
+        for idx, processed_sentence in enumerate(processed_text):
+            original_words = text[idx].split()  # List[str]
+            processed_words = processed_sentence.split()  # List[str]
+            print(processed_words)
+            tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
+            token_to_processed_word = match_token_to_word(processed_sentence, tokenized_sentence_tokens)
+            print(token_to_processed_word)
+            original_to_processed = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
+            processed_to_original = map_processed_to_original(original_words, processed_words, n=n, cutoff=cutoff)
+            
+            token_to_original = {}
+            for token, processed_words in token_to_processed_word.items():
+                token_to_original[token] = []
+                for processed_word in processed_words:
+                    token_to_original[token].extend(processed_to_original[processed_word][0])
+            
+            # reverse that dict
+            original_to_token = {}
+            for token, original_words in token_to_original.items():
+                for original_word in original_words:
+                    if original_word not in original_to_token:
+                        original_to_token[original_word] = []
+                    original_to_token[original_word].append(token)
+
+            for original_word in original_words:
+                letters = list(original_word)
+                for token in original_to_token[original_word]:
+                    tok = preprocess_token(token)
+                    tok_letters = list(tok)
+                    for 
+
+        return original_to_token
 
 class FastTextModule(pl.LightningModule):
     """

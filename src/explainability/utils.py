@@ -6,6 +6,7 @@ from typing import Tuple
 from scipy.special import softmax
 import numpy as np
 import difflib
+from collections import Counter
 
 def get_top_tokens(text, tokenized_text, id_to_token_dicts, attr, top_k=5, padding_index=2009603, end_of_string_index = 0):
 
@@ -71,52 +72,219 @@ def match_token_to_word(sentence, list_tokens):
 
         matching_words = []
         for i, tok in enumerate(preprocessed_token):
+            
             # Find all the preprocessed words that contain the token
-            matching_word = next((word for word in words if tok in word), None)
-            matching_words.append(matching_word)
+            for word in words:
+                if tok in word:
+                    matching_words.append(word)
+
         token_to_word[token] = matching_words
     return token_to_word
 
-
-def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
+def levenshtein(s1, s2):
     """
-    Map processed words to original words based on similarity scores.
-
-    Args:
-        processed_words (List[str]): List of processed words.
-        original_words (List[str]): List of original words.
-        n (int): Number of closest processed words to consider for a given original word.
-        cutoff (float): Minimum similarity score for a match.
-    
-    Returns:
-        Dict[str, Tuple[List[str], List[float]]]: Mapping from original word to tuple of closest processed words and similarity scores.
+    Calculate the Levenshtein distance between two strings.
+    Returns a normalized score between 0 and 1, where 1 means identical.
     """
+    if len(s1) < len(s2):
+        return levenshtein(s2, s1)
+    if len(s2) == 0:
+        return 0.0
 
-    # For each word in the original list, find the n closest matching processed words
-    word_mapping = {}
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
 
-    for original_word in original_words:
-        processed_word_scores = []
+    # Normalize by the length of the longer string
+    max_len = max(len(s1), len(s2))
+    return 1 - (previous_row[-1] / max_len)
 
-        # Calculate the similarity score for each processed word with the current original word
-        for processed_word in processed_words:
-            similarity_score = difflib.SequenceMatcher(None, processed_word, original_word).ratio() # Ratcliff-Obershelp algorithm
+def jaro_winkler(s1, s2, p=0.1):
+    """
+    Calculate Jaro-Winkler similarity between two strings.
+    p is the scaling factor for how much to favor matching prefixes.
+    """
+    # If strings are equal
+    if s1 == s2:
+        return 1.0
 
-            # Only consider matches with similarity above the cutoff
-            if similarity_score >= cutoff:
-                processed_word_scores.append((processed_word, similarity_score))
+    # Find length of strings
+    len1 = len(s1)
+    len2 = len(s2)
+
+    # Maximum distance between two chars to be considered matching
+    match_distance = (max(len1, len2) // 2) - 1
+
+    # Arrays of booleans that indicate matching/non-matching chars
+    s1_matches = [False] * len1
+    s2_matches = [False] * len2
+
+    # Number of matches and transpositions
+    matches = 0
+    transpositions = 0
+
+    # Find matching characters within match_distance
+    for i in range(len1):
+        start = max(0, i - match_distance)
+        end = min(i + match_distance + 1, len2)
         
-        # Sort processed words by similarity score in descending order
-        processed_word_scores.sort(key=lambda x: x[1], reverse=True)
+        for j in range(start, end):
+            if not s2_matches[j] and s1[i] == s2[j]:
+                s1_matches[i] = True
+                s2_matches[j] = True
+                matches += 1
+                break
 
-        # Extract the n closest processed words and their similarity scores
-        closest_words = [item[0] for item in processed_word_scores[:n]]
-        similarity_scores = [item[1] for item in processed_word_scores[:n]]
+    if matches == 0:
+        return 0.0
 
-        # Add the tuple (list of closest words, list of similarity scores) to the mapping
-        word_mapping[original_word] = (closest_words, similarity_scores)
+    # Count transpositions
+    k = 0
+    for i in range(len1):
+        if s1_matches[i]:
+            while not s2_matches[k]:
+                k += 1
+            if s1[i] != s2[k]:
+                transpositions += 1
+            k += 1
 
-    return word_mapping
+    # Jaro similarity
+    transpositions = transpositions // 2
+    jaro = ((matches / len1) + (matches / len2) + 
+            ((matches - transpositions) / matches)) / 3.0
+
+    # Find length of common prefix (up to 4 chars)
+    prefix_len = 0
+    max_prefix_len = min(4, min(len1, len2))
+    while prefix_len < max_prefix_len and s1[prefix_len] == s2[prefix_len]:
+        prefix_len += 1
+
+    # Jaro-Winkler similarity
+    return jaro + (prefix_len * p * (1 - jaro))
+
+def longest_common_subsequence(s1, s2):
+    """
+    Calculate length of longest common subsequence between two strings.
+    Returns a normalized score between 0 and 1.
+    """
+    m, n = len(s1), len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s1[i-1] == s2[j-1]:
+                dp[i][j] = dp[i-1][j-1] + 1
+            else:
+                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+    
+    # Normalize by the length of the shorter string
+    return dp[m][n] / min(m, n)
+
+def ngram_cosine_similarity(s1, s2, n=2):
+    """
+    Calculate cosine similarity between character n-grams of two strings.
+    """
+    # Generate n-grams
+    def get_ngrams(s, n):
+        return [s[i:i+n] for i in range(max(0, len(s)-n+1))]
+    
+    # Get n-gram counts
+    vec1 = Counter(get_ngrams(s1.lower(), n))
+    vec2 = Counter(get_ngrams(s2.lower(), n))
+    
+    # Find common n-grams
+    intersection = set(vec1.keys()) & set(vec2.keys())
+    
+    # Calculate cosine similarity
+    numerator = sum(vec1[x] * vec2[x] for x in intersection)
+    sum1 = sum(val*val for val in vec1.values())
+    sum2 = sum(val*val for val in vec2.values())
+    denominator = np.sqrt(sum1) * np.sqrt(sum2)
+    
+    if not denominator:
+        return 0.0
+    return numerator / denominator
+
+def map_processed_to_original(processed_words, original_words , n=5, cutoff=0):
+    """
+    Find best matches using multiple similarity metrics.
+    """
+    matches = {}
+    
+    for orig in original_words:
+        similarities = []
+        for proc in processed_words:
+            # Calculate different similarity scores
+            lev_score = levenshtein(orig.lower(), proc.lower())
+            jw_score = jaro_winkler(orig.lower(), proc.lower())
+            lcs_score = longest_common_subsequence(orig.lower(), proc.lower())
+            cos_score = ngram_cosine_similarity(orig, proc)
+            
+            # Combine scores (you can adjust weights)
+            final_score = max(
+                lev_score * 0.2,
+                jw_score * 0.8,  # Give more weight to Jaro-Winkler
+                lcs_score * 0,
+                cos_score * 0.2
+            )
+            
+            if final_score >= cutoff:
+                similarities.append((proc, final_score))
+        
+        # Sort by score and take top n
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        top_matches = similarities[:n]
+        # Split into separate lists for words and scores
+        matched_words, scores = zip(*top_matches) if top_matches else ([], [])
+        matches[orig] = (list(matched_words), list(scores))
+    
+    return matches
+
+# def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
+#     """
+#     Map processed words to original words based on similarity scores.
+
+#     Args:
+#         processed_words (List[str]): List of processed words.
+#         original_words (List[str]): List of original words.
+#         n (int): Number of closest processed words to consider for a given original word.
+#         cutoff (float): Minimum similarity score for a match.
+    
+#     Returns:
+#         Dict[str, Tuple[List[str], List[float]]]: Mapping from original word to tuple of closest processed words and similarity scores.
+#     """
+
+#     # For each word in the original list, find the n closest matching processed words
+#     word_mapping = {}
+
+#     for original_word in original_words:
+#         processed_word_scores = []
+
+#         # Calculate the similarity score for each processed word with the current original word
+#         for processed_word in processed_words:
+#             similarity_score = difflib.SequenceMatcher(None, processed_word, original_word).ratio() # Ratcliff-Obershelp algorithm
+
+#             # Only consider matches with similarity above the cutoff
+#             if similarity_score >= cutoff:
+#                 processed_word_scores.append((processed_word, similarity_score))
+        
+#         # Sort processed words by similarity score in descending order
+#         processed_word_scores.sort(key=lambda x: x[1], reverse=True)
+
+#         # Extract the n closest processed words and their similarity scores
+#         closest_words = [item[0] for item in processed_word_scores[:n]]
+#         similarity_scores = [item[1] for item in processed_word_scores[:n]]
+
+#         # Add the tuple (list of closest words, list of similarity scores) to the mapping
+#         word_mapping[original_word] = (closest_words, similarity_scores)
+
+#     return word_mapping
 
 
 # at text level
@@ -213,7 +381,7 @@ def compute_word_score(word_to_score_dicts, text,  n=5, cutoff=0.75):
                 original_words[i] = word.replace(',', '')
       
             mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff) # Dict[str, Tuple[List[str], List[float]]]
-
+            print(mapping)
             scores = []
             for word in original_words:
                 processed_words, distances = mapping[word]
