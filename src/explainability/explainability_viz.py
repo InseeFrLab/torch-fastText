@@ -11,6 +11,9 @@ def visualize_word_scores(all_scores, original_texts, pred, n=5, cutoff=0.75):
         colors = sns.color_palette("mako", n_colors=topk)
 
         original_words = original_texts[idx].split()
+
+        original_words = list(filter(lambda x: x != ',', original_words))
+
         for i, word in enumerate(original_words):
             original_words[i] = word.replace(',', '')
 

@@ -12,11 +12,12 @@ from torch import nn
 import pytorch_lightning as pl
 from scipy.special import softmax
 from captum.attr import IntegratedGradients, LayerIntegratedGradients
+from difflib import SequenceMatcher
 
 from config.preprocess import clean_text_feature
 from explainability.utils import match_token_to_word, tokenized_text_in_tokens, \
                                  map_processed_to_original, compute_preprocessed_word_score, \
-                                 compute_word_score
+                                 compute_word_score, preprocess_token
 
 
 
@@ -235,7 +236,7 @@ class FastTextModel(nn.Module):
 
         return pred, confidence, all_scores
 
-    def predict_and_explain_continuous(self, text, params, top_k=1, n=5, cutoff=0.65):
+    def predict_and_explain_continuous(self, text, params, top_k=1, n=5, cutoff=0.9):
 
         pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
             = self.predict(text=text, params=params, top_k=top_k, explain=True)
@@ -244,36 +245,56 @@ class FastTextModel(nn.Module):
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
         for idx, processed_sentence in enumerate(processed_text):
             original_words = text[idx].split()  # List[str]
+            original_words = list(filter(lambda x: x != ',', original_words))
+
             processed_words = processed_sentence.split()  # List[str]
-            print(processed_words)
             tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
             token_to_processed_word = match_token_to_word(processed_sentence, tokenized_sentence_tokens)
-            print(token_to_processed_word)
             original_to_processed = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
-            processed_to_original = map_processed_to_original(original_words, processed_words, n=n, cutoff=cutoff)
             
+            processed_to_original = {}
+            for original_word, associated_processed_words in original_to_processed.items():
+                for processed_word in associated_processed_words[0]:
+                    if processed_word not in processed_to_original:
+                        processed_to_original[processed_word] = []
+                    processed_to_original[processed_word].append(original_word)
+
+
             token_to_original = {}
-            for token, processed_words in token_to_processed_word.items():
+            for token, associated_processed_words in token_to_processed_word.items():
                 token_to_original[token] = []
-                for processed_word in processed_words:
-                    token_to_original[token].extend(processed_to_original[processed_word][0])
+                for processed_word in associated_processed_words:
+                    token_to_original[token].extend(processed_to_original[processed_word])
             
             # reverse that dict
             original_to_token = {}
-            for token, original_words in token_to_original.items():
-                for original_word in original_words:
+            for token, associated_original_words in token_to_original.items():
+                for original_word in associated_original_words:
                     if original_word not in original_to_token:
                         original_to_token[original_word] = []
                     original_to_token[original_word].append(token)
 
+            pointer_sentence = 0
+            all_scores_letter = []
             for original_word in original_words:
                 letters = list(original_word)
-                for token in original_to_token[original_word]:
-                    tok = preprocess_token(token)
-                    tok_letters = list(tok)
-                    for 
+                scores_letter = np.zeros(len(letters))
 
-        return original_to_token
+                if original_word not in original_to_token:
+                    all_scores_letter.append(scores_letter)
+                    continue
+                for token in original_to_token[original_word]:
+                    tok = preprocess_token(token)[0]
+                    score_token = all_attr[idx, 0, tokenized_sentence_tokens.index(token)].item()
+                    sm = SequenceMatcher(None, original_word, tok)
+                    a, _, size = sm.find_longest_match()
+                    scores_letter[a:a + size] += score_token
+                all_scores_letter.append(scores_letter)
+            
+            all_scores_letter = np.hstack(all_scores_letter)
+    
+
+        return all_scores_letter
 
 class FastTextModule(pl.LightningModule):
     """

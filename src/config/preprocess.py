@@ -56,3 +56,54 @@ def clean_text_feature(
 
     # Return clean DataFrame
     return df
+
+def clean_text_input(
+    text: list[str]
+) -> pd.DataFrame:
+    """
+    Cleans a text feature for pd.DataFrame `df`.
+
+    Args:
+        df (pd.DataFrame): DataFrame.
+        text_feature (str): Name of the text feature.
+
+    Returns:
+        df (pd.DataFrame): DataFrame.
+    """
+
+    text = pd.Series(text)
+    # Define stopwords and stemmer
+    stopwords = tuple(ntlk_stopwords.words("french")) + tuple(string.ascii_lowercase)
+    stemmer = SnowballStemmer(language="french")
+
+    # Remove of accented characters
+    text = text.map(unidecode.unidecode)
+
+    # To lowercase
+    text = text.str.lower()
+
+    # Remove one letter words
+    text = text.apply(
+        lambda x: " ".join([w for w in x.split() if len(w) > 1])
+    )
+
+    # Remove duplicate words and stopwords in texts
+    # Stem words
+    libs_token = [lib.split() for lib in text.to_list()]
+    libs_token = [
+        sorted(set(libs_token[i]), key=libs_token[i].index)
+        for i in range(len(libs_token))
+    ]
+    text = [
+        " ".join(
+            [
+                stemmer.stem(word)
+                for word in libs_token[i]
+                # if word not in stopwords
+            ]
+        )
+        for i in range(len(libs_token))
+    ]
+
+    # Return clean DataFrame
+    return text

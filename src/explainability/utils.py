@@ -7,6 +7,7 @@ from scipy.special import softmax
 import numpy as np
 import difflib
 from collections import Counter
+from config.preprocess import clean_text_input
 
 def get_top_tokens(text, tokenized_text, id_to_token_dicts, attr, top_k=5, padding_index=2009603, end_of_string_index = 0):
 
@@ -173,6 +174,7 @@ def longest_common_subsequence(s1, s2):
     Calculate length of longest common subsequence between two strings.
     Returns a normalized score between 0 and 1.
     """
+
     m, n = len(s1), len(s2)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
     
@@ -211,80 +213,87 @@ def ngram_cosine_similarity(s1, s2, n=2):
         return 0.0
     return numerator / denominator
 
-def map_processed_to_original(processed_words, original_words , n=5, cutoff=0):
-    """
-    Find best matches using multiple similarity metrics.
-    """
-    matches = {}
-    
-    for orig in original_words:
-        similarities = []
-        for proc in processed_words:
-            # Calculate different similarity scores
-            lev_score = levenshtein(orig.lower(), proc.lower())
-            jw_score = jaro_winkler(orig.lower(), proc.lower())
-            lcs_score = longest_common_subsequence(orig.lower(), proc.lower())
-            cos_score = ngram_cosine_similarity(orig, proc)
-            
-            # Combine scores (you can adjust weights)
-            final_score = max(
-                lev_score * 0.2,
-                jw_score * 0.8,  # Give more weight to Jaro-Winkler
-                lcs_score * 0,
-                cos_score * 0.2
-            )
-            
-            if final_score >= cutoff:
-                similarities.append((proc, final_score))
-        
-        # Sort by score and take top n
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        top_matches = similarities[:n]
-        # Split into separate lists for words and scores
-        matched_words, scores = zip(*top_matches) if top_matches else ([], [])
-        matches[orig] = (list(matched_words), list(scores))
-    
-    return matches
-
-# def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.7):
+# def map_processed_to_original(processed_words, original_words , n=5, cutoff=0):
 #     """
-#     Map processed words to original words based on similarity scores.
-
-#     Args:
-#         processed_words (List[str]): List of processed words.
-#         original_words (List[str]): List of original words.
-#         n (int): Number of closest processed words to consider for a given original word.
-#         cutoff (float): Minimum similarity score for a match.
-    
-#     Returns:
-#         Dict[str, Tuple[List[str], List[float]]]: Mapping from original word to tuple of closest processed words and similarity scores.
+#     Find best matches using multiple similarity metrics.
 #     """
+#     matches = {}
+    
+#     for orig in original_words:
+#         orig_prepro = clean_text_input([orig])[0]
+#         similarities = []
+#         for proc in processed_words:
+#             # Calculate different similarity scores
+#             lev_score = levenshtein(orig_prepro, proc.lower())
+#             jw_score = jaro_winkler(orig_prepro, proc.lower())
+#             lcs_score = longest_common_subsequence(orig_prepro, proc.lower())
+#             cos_score = ngram_cosine_similarity(orig_prepro, proc)
+            
+#             # Combine scores (you can adjust weights)
+#             # final_score = max(
+#             #     lev_score * 1,
+#             #     # jw_score * 0.8,  # Give more weight to Jaro-Winkler
+#             #     # lcs_score * 0,
+#             #     # cos_score * 0.2
+#             # )
 
-#     # For each word in the original list, find the n closest matching processed words
-#     word_mapping = {}
-
-#     for original_word in original_words:
-#         processed_word_scores = []
-
-#         # Calculate the similarity score for each processed word with the current original word
-#         for processed_word in processed_words:
-#             similarity_score = difflib.SequenceMatcher(None, processed_word, original_word).ratio() # Ratcliff-Obershelp algorithm
-
-#             # Only consider matches with similarity above the cutoff
-#             if similarity_score >= cutoff:
-#                 processed_word_scores.append((processed_word, similarity_score))
+#             final_score = lev_score
+            
+#             if final_score >= cutoff:
+#                 similarities.append((proc, final_score))
         
-#         # Sort processed words by similarity score in descending order
-#         processed_word_scores.sort(key=lambda x: x[1], reverse=True)
+#         # Sort by score and take top n
+#         similarities.sort(key=lambda x: x[1], reverse=True)
+#         top_matches = similarities[:n]
+#         # Split into separate lists for words and scores
+#         matched_words, scores = zip(*top_matches) if top_matches else ([], [])
+#         matches[orig] = (list(matched_words), list(scores))
+    
+#     return matches
 
-#         # Extract the n closest processed words and their similarity scores
-#         closest_words = [item[0] for item in processed_word_scores[:n]]
-#         similarity_scores = [item[1] for item in processed_word_scores[:n]]
+def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.9):
+    """
+    Map processed words to original words based on similarity scores.
 
-#         # Add the tuple (list of closest words, list of similarity scores) to the mapping
-#         word_mapping[original_word] = (closest_words, similarity_scores)
+    Args:
+        processed_words (List[str]): List of processed words.
+        original_words (List[str]): List of original words.
+        n (int): Number of closest processed words to consider for a given original word.
+        cutoff (float): Minimum similarity score for a match.
+    
+    Returns:
+        Dict[str, Tuple[List[str], List[float]]]: Mapping from original word to tuple of closest processed words and similarity scores.
+    """
 
-#     return word_mapping
+    # For each word in the original list, find the n closest matching processed words
+    word_mapping = {}
+
+    for original_word in original_words:
+        original_word_prepro = clean_text_input([original_word])[0]
+
+        if original_word_prepro == '':
+            continue
+        processed_word_scores = []
+
+        # Calculate the similarity score for each processed word with the current original word
+        for processed_word in processed_words:
+            similarity_score = difflib.SequenceMatcher(None, processed_word, original_word_prepro).ratio() # Ratcliff-Obershelp algorithm
+
+            # Only consider matches with similarity above the cutoff
+            if similarity_score >= cutoff:
+                processed_word_scores.append((processed_word, similarity_score))
+        
+        # Sort processed words by similarity score in descending order
+        processed_word_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # Extract the n closest processed words and their similarity scores
+        closest_words = [item[0] for item in processed_word_scores[:n]]
+        similarity_scores = [item[1] for item in processed_word_scores[:n]]
+
+        # Add the tuple (list of closest words, list of similarity scores) to the mapping
+        word_mapping[original_word] = (closest_words, similarity_scores)
+
+    return word_mapping
 
 
 # at text level
@@ -381,9 +390,10 @@ def compute_word_score(word_to_score_dicts, text,  n=5, cutoff=0.75):
                 original_words[i] = word.replace(',', '')
       
             mapping = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff) # Dict[str, Tuple[List[str], List[float]]]
-            print(mapping)
             scores = []
             for word in original_words:
+                if word not in mapping:
+                    continue
                 processed_words, distances = mapping[word]
                 word_score = 0
                 for i, potential_processed_word in enumerate(processed_words):
