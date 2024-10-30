@@ -241,7 +241,6 @@ class FastTextModel(nn.Module):
         pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
             = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
-
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
         for idx, processed_sentence in enumerate(processed_text):
             original_words = text[idx].split()  # List[str]
@@ -275,26 +274,28 @@ class FastTextModel(nn.Module):
                     original_to_token[original_word].append(token)
 
             pointer_sentence = 0
-            all_scores_letter = []
-            for original_word in original_words:
-                letters = list(original_word)
-                scores_letter = np.zeros(len(letters))
+            all_scores_letter_topk = []
+            for k in range(top_k):
+                all_scores_letter = []
+                for original_word in original_words:
+                    letters = list(original_word)
+                    scores_letter = np.zeros(len(letters))
 
-                if original_word not in original_to_token:
+                    if original_word not in original_to_token:
+                        all_scores_letter.append(scores_letter)
+                        continue
+                    for token in original_to_token[original_word]:
+                        tok = preprocess_token(token)[0]
+                        score_token = all_attr[idx, k, tokenized_sentence_tokens.index(token)].item()
+                        sm = SequenceMatcher(None, original_word, tok)
+                        a, _, size = sm.find_longest_match()
+                        scores_letter[a:a + size] += score_token
                     all_scores_letter.append(scores_letter)
-                    continue
-                for token in original_to_token[original_word]:
-                    tok = preprocess_token(token)[0]
-                    score_token = all_attr[idx, 0, tokenized_sentence_tokens.index(token)].item()
-                    sm = SequenceMatcher(None, original_word, tok)
-                    a, _, size = sm.find_longest_match()
-                    scores_letter[a:a + size] += score_token
-                all_scores_letter.append(scores_letter)
-            
-            all_scores_letter = np.hstack(all_scores_letter)
-    
-
-        return all_scores_letter
+                
+                all_scores_letter = np.hstack(all_scores_letter)
+                all_scores_letter_topk.append(all_scores_letter)
+            all_scores_letter_topk = np.vstack(all_scores_letter_topk)
+        return all_scores_letter_topk
 
 class FastTextModule(pl.LightningModule):
     """
