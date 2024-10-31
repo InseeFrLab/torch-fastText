@@ -169,6 +169,7 @@ class NGramTokenizer:
         # Adding end of string token
         indices += [0]
         words += ["</s>"]
+        all_tokens_id["</s>"] = 0
 
         # Adding word n-grams
         for word_ngram_len in range(2, self.word_ngrams + 1):

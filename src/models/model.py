@@ -12,12 +12,11 @@ from torch import nn
 import pytorch_lightning as pl
 from scipy.special import softmax
 from captum.attr import IntegratedGradients, LayerIntegratedGradients
-from difflib import SequenceMatcher
 
 from config.preprocess import clean_text_feature
-from explainability.utils import match_token_to_word, tokenized_text_in_tokens, \
+from explainability.utils import tokenized_text_in_tokens, \
                                  map_processed_to_original, compute_preprocessed_word_score, \
-                                 compute_word_score, preprocess_token
+                                 compute_word_score, preprocess_token, explain_continuous
 
 
 
@@ -56,8 +55,6 @@ class FastTextModel(nn.Module):
         self.tokenizer = tokenizer
         self.nace_encoder = nace_encoder
         self.embedding_dim = embedding_dim
-
-
         self.embeddings = nn.Embedding(
             embedding_dim=embedding_dim,
             num_embeddings=vocab_size,
@@ -223,79 +220,24 @@ class FastTextModel(nn.Module):
         pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
             = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
-
-
+        tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
         # Step 2: Map the attributions at token level to the processed words
-        processed_word_to_score_dicts = compute_preprocessed_word_score(
-                            processed_text, tokenized_text,
+        processed_word_to_score_dicts, processed_word_to_token_idx_dicts = \
+            compute_preprocessed_word_score(
+                            processed_text, tokenized_text_tokens,
                             all_attr, id_to_token_dicts, token_to_id_dicts,
                             padding_index=2009603, end_of_string_index=0
                             )
         # Step 3: Map the processed words to the original words
-        all_scores = compute_word_score(processed_word_to_score_dicts, text, n=n, cutoff=cutoff) # 
+        all_scores, orig_to_processed_mappings = compute_word_score(processed_word_to_score_dicts, text, n=n, cutoff=cutoff)
 
-        return pred, confidence, all_scores
+        all_scores_letters = explain_continuous(
+            text, processed_text, tokenized_text_tokens, orig_to_processed_mappings,
+            processed_word_to_token_idx_dicts, all_attr, top_k
+                                                     )
 
-    def predict_and_explain_continuous(self, text, params, top_k=1, n=5, cutoff=0.9):
+        return pred, confidence, all_scores, all_scores_letters
 
-        pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
-            = self.predict(text=text, params=params, top_k=top_k, explain=True)
-
-        tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
-        for idx, processed_sentence in enumerate(processed_text):
-            original_words = text[idx].split()  # List[str]
-            original_words = list(filter(lambda x: x != ',', original_words))
-
-            processed_words = processed_sentence.split()  # List[str]
-            tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
-            token_to_processed_word = match_token_to_word(processed_sentence, tokenized_sentence_tokens)
-            original_to_processed = map_processed_to_original(processed_words, original_words, n=n, cutoff=cutoff)
-            
-            processed_to_original = {}
-            for original_word, associated_processed_words in original_to_processed.items():
-                for processed_word in associated_processed_words[0]:
-                    if processed_word not in processed_to_original:
-                        processed_to_original[processed_word] = []
-                    processed_to_original[processed_word].append(original_word)
-
-
-            token_to_original = {}
-            for token, associated_processed_words in token_to_processed_word.items():
-                token_to_original[token] = []
-                for processed_word in associated_processed_words:
-                    token_to_original[token].extend(processed_to_original[processed_word])
-            
-            # reverse that dict
-            original_to_token = {}
-            for token, associated_original_words in token_to_original.items():
-                for original_word in associated_original_words:
-                    if original_word not in original_to_token:
-                        original_to_token[original_word] = []
-                    original_to_token[original_word].append(token)
-
-            pointer_sentence = 0
-            all_scores_letter_topk = []
-            for k in range(top_k):
-                all_scores_letter = []
-                for original_word in original_words:
-                    letters = list(original_word)
-                    scores_letter = np.zeros(len(letters))
-
-                    if original_word not in original_to_token:
-                        all_scores_letter.append(scores_letter)
-                        continue
-                    for token in original_to_token[original_word]:
-                        tok = preprocess_token(token)[0]
-                        score_token = all_attr[idx, k, tokenized_sentence_tokens.index(token)].item()
-                        sm = SequenceMatcher(None, original_word, tok)
-                        a, _, size = sm.find_longest_match()
-                        scores_letter[a:a + size] += score_token
-                    all_scores_letter.append(scores_letter)
-                
-                all_scores_letter = np.hstack(all_scores_letter)
-                all_scores_letter_topk.append(all_scores_letter)
-            all_scores_letter_topk = np.vstack(all_scores_letter_topk)
-        return all_scores_letter_topk
 
 class FastTextModule(pl.LightningModule):
     """
