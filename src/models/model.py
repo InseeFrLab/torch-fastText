@@ -12,6 +12,7 @@ from torch import nn
 import pytorch_lightning as pl
 from scipy.special import softmax
 from captum.attr import IntegratedGradients, LayerIntegratedGradients
+from scipy.special import softmax
 
 from config.preprocess import clean_text_feature
 from explainability.utils import tokenized_text_in_tokens, \
@@ -196,9 +197,10 @@ class FastTextModel(nn.Module):
         
         if explain:
             
-            return predictions, confidence, all_attributions, x, id_to_token_dicts, token_to_id_dicts, df.text
+            return predictions, confidence, all_attributions, x, id_to_token_dicts, \
+                   token_to_id_dicts, df.text, label_scores
         else:
-            return predictions, confidence
+            return predictions, confidence, label_scores
 
     def predict_and_explain(self, text, params, top_k=1, n=5, cutoff=0.65):
         """
@@ -217,8 +219,8 @@ class FastTextModel(nn.Module):
         """
 
         # Step 1: Get the predictions, confidence scores and attributions at token level
-        pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, processed_text \
-            = self.predict(text=text, params=params, top_k=top_k, explain=True)
+        pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, \
+            processed_text, _ = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
         # Step 2: Map the attributions at token level to the processed words

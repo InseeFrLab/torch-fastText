@@ -28,6 +28,40 @@ from config.dataset import FastTextModelDataset
 from tokenizer.tokenizer import NGramTokenizer
 from models.model import FastTextModule, FastTextModel
 
+import torch.nn.functional as F
+
+class OneVsAllLoss(nn.Module):
+    def __init__(self):
+        super(OneVsAllLoss, self).__init__()
+        
+    def forward(self, logits, targets):
+        """
+        Compute One-vs-All loss
+        
+        Args:
+            logits: Tensor of shape (batch_size, num_classes) containing classification scores
+            targets: Tensor of shape (batch_size) containing true class indices
+            
+        Returns:
+            loss: Mean loss value across the batch
+        """
+        batch_size = logits.size(0)
+        num_classes = logits.size(1)
+        
+        # Convert targets to one-hot encoding
+        targets_one_hot = F.one_hot(targets, num_classes=num_classes).float()
+        
+        # For each sample, treat the true class as positive and all others as negative
+        # Using binary cross entropy for each class
+        loss = F.binary_cross_entropy_with_logits(
+            logits,  # Raw logits
+            targets_one_hot,  # Target probabilities
+            reduction='none'  # Don't reduce yet to allow for custom weighting if needed
+        )
+        
+        # Sum losses across all classes for each sample, then take mean across batch
+        return loss.sum(dim=1).mean()
+
 
 def train(
     df: pd.DataFrame,
@@ -35,6 +69,7 @@ def train(
     text_feature: str,
     categorical_features: Optional[List[str]],
     params: Dict,
+    loss:str = 'crossentropy'
 ):
     """
     Train method.
@@ -128,11 +163,11 @@ def train(
         "mode": "min",
         "patience": patience,
     }
-
+    loss = nn.CrossEntropyLoss() if loss == 'crossentropy' else OneVsAllLoss()
     # Lightning module
     module = FastTextModule(
         model=model,
-        loss=nn.CrossEntropyLoss(),
+        loss=loss,
         optimizer=optimizer,
         optimizer_params=optimizer_params,
         scheduler=scheduler,
@@ -187,6 +222,7 @@ if __name__ == "__main__":
     remote_server_uri = sys.argv[1]
     experiment_name = sys.argv[2]
     run_name = sys.argv[3]
+    loss = sys.argv[4]
 
     # Load data
     fs = s3fs.S3FileSystem(
@@ -233,6 +269,7 @@ if __name__ == "__main__":
                 "wordNgrams": 3,
                 "sparse": False,
             },
+            loss=loss
         )
         best_model = type(light_module).load_from_checkpoint(
             checkpoint_path=trainer.checkpoint_callback.best_model_path,
