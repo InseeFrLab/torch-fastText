@@ -274,7 +274,6 @@ def explain_continuous(text, processed_text, tokenized_text_tokens, mappings,
 
 
     """
-
     for idx, processed_sentence in enumerate(processed_text):
         tokenized_sentence_tokens = tokenized_text_tokens[idx]
         mapping = mappings[idx]
