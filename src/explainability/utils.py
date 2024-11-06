@@ -95,14 +95,22 @@ def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.9):
     return word_mapping
 
 def test_end_of_word(all_processed_words, word, target_token, next_token):
+    flag = False
     if target_token[-1] == '>':
         if next_token[0] == '<':
+            if word in target_token:
+                flag = True
+            if word in next_token:
+                flag = False
             if next_token[1] != word[0]:
-                return True
+                flag = True
+            if len(next_token) == 3:
+                if next_token[2] != word[1]:
+                    flag = True
         if next_token in all_processed_words:
-            return True
+            flag = True
 
-    return False
+    return flag
 
 
 def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
@@ -121,10 +129,12 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
     pointer_token = 0
     res = {}
     processed_words = sentence.split()
-
+    print(tokenized_sentence_tokens)
     # we know the tokens are in the right order
     for index_word, word in enumerate(sentence.split()):
-        res[word] = []
+        if word not in res:
+            res[word] = []
+
         start = pointer_token
 
         # while we don't reach the end of the word, get going
@@ -134,7 +144,8 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
 
         pointer_token += 1
         end = pointer_token
-        res[word] = list(range(start, end))
+
+        res[word] += list(range(start, end))
 
     # here we arrive at the end of the sentence
     assert tokenized_sentence_tokens[pointer_token] == '</s>'
