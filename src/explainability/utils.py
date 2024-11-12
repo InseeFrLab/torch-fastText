@@ -105,13 +105,11 @@ def test_end_of_word(all_processed_words, word, target_token, next_token):
             if next_token[1] != word[0]:
                 flag = True
             if len(next_token) == 3:
-                if next_token[2] != word[1]:
-                    flag = True
+                flag = True
         if next_token in all_processed_words:
             flag = True
 
     return flag
-
 
 def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
 
@@ -136,6 +134,7 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
             res[word] = []
 
         start = pointer_token
+        print(word)
 
         # while we don't reach the end of the word, get going
         while not test_end_of_word(processed_words, word, tokenized_sentence_tokens[pointer_token],
@@ -146,6 +145,8 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
         end = pointer_token
 
         res[word] += list(range(start, end))
+
+        print([tokenized_sentence_tokens[i] for i in res[word]])
 
     # here we arrive at the end of the sentence
     assert tokenized_sentence_tokens[pointer_token] == '</s>'

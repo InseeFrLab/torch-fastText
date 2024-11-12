@@ -3,6 +3,7 @@ Train the fastText model implemented with Pytorch.
 """
 import sys
 import s3fs
+import argparse
 from typing import List, Optional, Dict
 import pytorch_lightning as pl
 import torch
@@ -95,6 +96,8 @@ def train(
     word_ngrams = params["wordNgrams"]
     sparse = params["sparse"]
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Train/val split
     features = [text_feature]
     if categorical_features is not None:
@@ -150,7 +153,7 @@ def train(
         categorical_vocabulary_sizes=categorical_vocabulary_sizes,
         padding_idx=buckets + tokenizer.get_nwords(),
         sparse=sparse,
-    )
+    ).to(device)
 
     # Define optimizer & scheduler
     if sparse:
@@ -219,10 +222,22 @@ if __name__ == "__main__":
     np.random.seed(0)
     random.seed(0)
 
-    remote_server_uri = sys.argv[1]
-    experiment_name = sys.argv[2]
-    run_name = sys.argv[3]
-    loss = sys.argv[4]
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--uri", type=str, help="MLflow tracking URI", default="https://projet-ape-mlflow.user.lab.sspcloud.fr/")
+    parser.add_argument("--experiment_name", type=str, help="MLflow experiment name", default=None)
+    parser.add_argument("--run_name", type=str, help="MLflow run name", default=None)
+
+    parser.add_argument("--loss", type=str, help="Loss function", default="crossentropy",
+                        choices=["crossentropy", "ova"]
+                        )
+
+    args = parser.parse_args()
+
+    remote_server_uri = args.uri
+    experiment_name = args.experiment_name
+    run_name = args.run_name
+    loss = args.loss
 
     # Load data
     fs = s3fs.S3FileSystem(
@@ -237,7 +252,7 @@ if __name__ == "__main__":
         .to_pandas()
     )
     # Subset of df to keep things short
-    df = df.sample(frac=0.1)
+    # df = df.sample(frac=0.1)
     # Clean text feature
     df = clean_text_feature(df, text_feature="text")
     # Add fictitious additional variable
@@ -256,7 +271,7 @@ if __name__ == "__main__":
             text_feature="text",
             categorical_features=["additional_var"],
             params={
-                "max_epochs": 5,
+                "max_epochs": 1,
                 "patience": 3,
                 "train_proportion": 0.8,
                 "batch_size": 256,

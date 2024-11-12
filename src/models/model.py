@@ -21,6 +21,8 @@ from explainability.utils import tokenized_text_in_tokens, \
 
 
 
+import time
+
 class FastTextModel(nn.Module):
     """
     FastText Pytorch Model.
@@ -219,26 +221,54 @@ class FastTextModel(nn.Module):
         """
 
         # Step 1: Get the predictions, confidence scores and attributions at token level
+        all_times = []
+        start = time.time()
+
+        start_pred = time.time()
         pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, \
             processed_text, _ = self.predict(text=text, params=params, top_k=top_k, explain=True)
+        end_pred = time.time()
+        print(f"Predictions: {end_pred - start_pred}")
+        all_times.append(end_pred - start_pred)
 
+        start_2 = time.time()
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
+        end_2 = time.time()
+        print(f"Tokenized text: {end_2 - start_2}")
+        all_times.append(end_2 - start_2)
+
         # Step 2: Map the attributions at token level to the processed words
+        start_3 = time.time()
         processed_word_to_score_dicts, processed_word_to_token_idx_dicts = \
             compute_preprocessed_word_score(
                             processed_text, tokenized_text_tokens,
                             all_attr, id_to_token_dicts, token_to_id_dicts,
                             padding_index=2009603, end_of_string_index=0
                             )
+        end_3 = time.time()
+        print(f"Processed words: {end_3 - start_3}")
+        all_times.append(end_3 - start_3)
         # Step 3: Map the processed words to the original words
+        start_4 = time.time()
         all_scores, orig_to_processed_mappings = compute_word_score(processed_word_to_score_dicts, text, n=n, cutoff=cutoff)
+        end_4 = time.time()
+        print(f"Original words: {end_4 - start_4}")
+        all_times.append(end_4 - start_4)
 
+        start_5 = time.time()
         all_scores_letters = explain_continuous(
             text, processed_text, tokenized_text_tokens, orig_to_processed_mappings,
             processed_word_to_token_idx_dicts, all_attr, top_k
                                                      )
+        end_5 = time.time()
+        print(f"Letters: {end_5 - start_5}")
+        all_times.append(end_5 - start_5)
 
-        return pred, confidence, all_scores, all_scores_letters
+        end = time.time()
+        print(f"Total: {end - start}")
+        all_times.append(end - start)
+
+        return pred, confidence, all_scores, all_scores_letters, all_times
 
 
 class FastTextModule(pl.LightningModule):
