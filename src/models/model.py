@@ -256,7 +256,6 @@ class FastTextModel(nn.Module):
 
         assert self.direct_bagging == False, "Direct bagging should be False for explainability"
 
-
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
 
         # Step 2: Map the attributions at token level to the processed words
