@@ -71,7 +71,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         y = self.outputs[index]
         return [text, *categorical_variables, y]
 
-    def collate_fn(self, batch) -> Tuple[torch.LongTensor]:
+    def collate_fn(self, batch):
         """
         Processing on a batch.
 
@@ -82,37 +82,24 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             Tuple[torch.LongTensor]: Observation with given index.
         """
         # Get inputs
-        batch = np.array(batch)
-        text = batch[:, 0].tolist()
-        categorical_variables = [
-            batch[:, 1 + i] for i in range(len(self.categorical_variables))
-        ]
-        y = batch[:, -1]
+        text = [item[0] for item in batch]
+        categorical_variables = [[item[1 + i] for item in batch] for i in range(len(self.categorical_variables))]
+        y = [item[-1] for item in batch]
 
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
-        max_tokens = max([len(indices) for indices in indices_batch])
+        max_tokens = max(len(indices) for indices in indices_batch)
 
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
-        padded_batch = [
-            np.pad(
-                indices,
-                (0, max_tokens - len(indices)),
-                "constant",
-                constant_values=padding_index,
-            )
-            for indices in indices_batch
-        ]
-        padded_batch = np.stack(padded_batch)
+        padded_batch = torch.nn.utils.rnn.pad_sequence(
+            [torch.LongTensor(indices) for indices in indices_batch],
+            batch_first=True,
+            padding_value=padding_index
+        )
 
-        # Cast
-        x = torch.LongTensor(padded_batch.astype(np.int32))
-        categorical_tensors = [
-            torch.LongTensor(variable.astype(np.int32))
-            for variable in categorical_variables
-        ]
-        y = torch.LongTensor(y.astype(np.int32))
+        categorical_tensors = [torch.LongTensor(variable) for variable in categorical_variables]
+        y = torch.LongTensor(y)
 
-        return (x, *categorical_tensors, y)
+        return (padded_batch, *categorical_tensors, y)
 
     def create_dataloader(
         self,

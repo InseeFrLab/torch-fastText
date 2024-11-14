@@ -127,14 +127,13 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
     pointer_token = 0
     res = {}
     processed_words = sentence.split()
-    print(tokenized_sentence_tokens)
+
     # we know the tokens are in the right order
     for index_word, word in enumerate(sentence.split()):
         if word not in res:
             res[word] = []
 
         start = pointer_token
-        print(word)
 
         # while we don't reach the end of the word, get going
         while not test_end_of_word(processed_words, word, tokenized_sentence_tokens[pointer_token],
@@ -145,8 +144,6 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
         end = pointer_token
 
         res[word] += list(range(start, end))
-
-        print([tokenized_sentence_tokens[i] for i in res[word]])
 
     # here we arrive at the end of the sentence
     assert tokenized_sentence_tokens[pointer_token] == '</s>'
@@ -192,6 +189,8 @@ def compute_preprocessed_word_score(preprocessed_text, tokenized_text_tokens, sc
     
     word_to_score_dicts = []
     word_to_token_idx_dicts = []
+
+    print(len(tokenized_text_tokens[0]))
     
     for idx, sentence in enumerate(preprocessed_text):
         tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
@@ -207,6 +206,7 @@ def compute_preprocessed_word_score(preprocessed_text, tokenized_text_tokens, sc
 
             score_sentence = score_sentence_topk[k]
 
+            print(score_sentence.shape)
             for word, associated_token_idx in word_to_token_idx.items():
                 associated_token_idx = torch.tensor(associated_token_idx).int()
                 word_to_score[word] = torch.sum(score_sentence[associated_token_idx]).item()
