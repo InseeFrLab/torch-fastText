@@ -6,6 +6,8 @@ import torch
 import numpy as np
 from tokenizer.tokenizer import NGramTokenizer
 
+import time
+
 
 class FastTextModelDataset(torch.utils.data.Dataset):
     """
@@ -89,7 +91,6 @@ class FastTextModelDataset(torch.utils.data.Dataset):
 
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
         max_tokens = max([len(indices) for indices in indices_batch])
-
 
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
         padded_batch = [
