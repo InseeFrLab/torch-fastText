@@ -1,6 +1,7 @@
 """
 Train the fastText model implemented with Pytorch.
 """
+
 from pathlib import Path
 import sys
 import s3fs
@@ -124,11 +125,7 @@ def train_fasttext(
     )
 
     # Train the fasttext model
-    model = fasttext.train_supervised(
-        training_data_path,
-        **params,
-        verbose=2
-    )
+    model = fasttext.train_supervised(training_data_path, **params, verbose=2)
 
     # Log parameters
     for param_name, param_value in params.items():
@@ -145,10 +142,7 @@ def train_fasttext(
     predictions = model.predict(val_texts, k=1)
     predictions = [x[0].replace("__label__", "") for x in predictions[0]]
 
-    booleans = [
-        prediction == str(label)
-        for prediction, label in zip(predictions, df_val[y])
-    ]
+    booleans = [prediction == str(label) for prediction, label in zip(predictions, df_val[y])]
     accuracy = sum(booleans) / len(booleans)
 
     # Log accuracy

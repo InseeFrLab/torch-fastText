@@ -1,6 +1,7 @@
 """
 Processing fns.
 """
+
 import string
 import pandas as pd
 import unidecode
@@ -8,9 +9,7 @@ from nltk.corpus import stopwords as ntlk_stopwords
 from nltk.stem.snowball import SnowballStemmer
 
 
-def clean_text_feature(
-    df: pd.DataFrame, text_feature: str
-) -> pd.DataFrame:
+def clean_text_feature(df: pd.DataFrame, text_feature: str) -> pd.DataFrame:
     """
     Cleans a text feature for pd.DataFrame `df`.
 
@@ -40,26 +39,18 @@ def clean_text_feature(
     # Stem words
     libs_token = [lib.split() for lib in df[text_feature].to_list()]
     libs_token = [
-        sorted(set(libs_token[i]), key=libs_token[i].index)
-        for i in range(len(libs_token))
+        sorted(set(libs_token[i]), key=libs_token[i].index) for i in range(len(libs_token))
     ]
     df[text_feature] = [
-        " ".join(
-            [
-                stemmer.stem(word)
-                for word in libs_token[i]
-                if word not in stopwords
-            ]
-        )
+        " ".join([stemmer.stem(word) for word in libs_token[i] if word not in stopwords])
         for i in range(len(libs_token))
     ]
 
     # Return clean DataFrame
     return df
 
-def clean_text_input(
-    text: list[str]
-) -> pd.DataFrame:
+
+def clean_text_input(text: list[str]) -> pd.DataFrame:
     """
     Cleans a text feature for pd.DataFrame `df`.
 
@@ -83,16 +74,13 @@ def clean_text_input(
     text = text.str.lower()
 
     # Remove one letter words
-    text = text.apply(
-        lambda x: " ".join([w for w in x.split() if len(w) > 1])
-    )
+    text = text.apply(lambda x: " ".join([w for w in x.split() if len(w) > 1]))
 
     # Remove duplicate words and stopwords in texts
     # Stem words
     libs_token = [lib.split() for lib in text.to_list()]
     libs_token = [
-        sorted(set(libs_token[i]), key=libs_token[i].index)
-        for i in range(len(libs_token))
+        sorted(set(libs_token[i]), key=libs_token[i].index) for i in range(len(libs_token))
     ]
     text = [
         " ".join(

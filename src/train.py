@@ -1,6 +1,7 @@
 """
 Train the fastText model implemented with Pytorch.
 """
+
 import sys
 import s3fs
 import argparse
@@ -31,35 +32,36 @@ from models.model import FastTextModule, FastTextModel
 
 import torch.nn.functional as F
 
+
 class OneVsAllLoss(nn.Module):
     def __init__(self):
         super(OneVsAllLoss, self).__init__()
-        
+
     def forward(self, logits, targets):
         """
         Compute One-vs-All loss
-        
+
         Args:
             logits: Tensor of shape (batch_size, num_classes) containing classification scores
             targets: Tensor of shape (batch_size) containing true class indices
-            
+
         Returns:
             loss: Mean loss value across the batch
         """
         batch_size = logits.size(0)
         num_classes = logits.size(1)
-        
+
         # Convert targets to one-hot encoding
         targets_one_hot = F.one_hot(targets, num_classes=num_classes).float()
-        
+
         # For each sample, treat the true class as positive and all others as negative
         # Using binary cross entropy for each class
         loss = F.binary_cross_entropy_with_logits(
             logits,  # Raw logits
             targets_one_hot,  # Target probabilities
-            reduction='none'  # Don't reduce yet to allow for custom weighting if needed
+            reduction="none",  # Don't reduce yet to allow for custom weighting if needed
         )
-        
+
         # Sum losses across all classes for each sample, then take mean across batch
         return loss.sum(dim=1).mean()
 
@@ -70,7 +72,7 @@ def train(
     text_feature: str,
     categorical_features: Optional[List[str]],
     params: Dict,
-    loss:str = 'crossentropy'
+    loss: str = "crossentropy",
 ):
     """
     Train method.
@@ -111,9 +113,7 @@ def train(
     )
 
     training_text = X_train[text_feature].to_list()
-    tokenizer = NGramTokenizer(
-        min_count, min_n, max_n, buckets, word_ngrams, training_text
-    )
+    tokenizer = NGramTokenizer(min_count, min_n, max_n, buckets, word_ngrams, training_text)
 
     train_dataset = FastTextModelDataset(
         categorical_variables=[
@@ -124,19 +124,13 @@ def train(
         tokenizer=tokenizer,
     )
     val_dataset = FastTextModelDataset(
-        categorical_variables=[
-            X_val[column].to_list() for column in X_val[categorical_features]
-        ],
+        categorical_variables=[X_val[column].to_list() for column in X_val[categorical_features]],
         texts=X_val[text_feature].to_list(),
         outputs=y_val.to_list(),
         tokenizer=tokenizer,
     )
-    train_dataloader = train_dataset.create_dataloader(
-        batch_size=batch_size, num_workers=72
-    )
-    val_dataloader = val_dataset.create_dataloader(
-        batch_size=batch_size, num_workers=72
-    )
+    train_dataloader = train_dataset.create_dataloader(batch_size=batch_size, num_workers=72)
+    val_dataloader = val_dataset.create_dataloader(batch_size=batch_size, num_workers=72)
 
     # Compute num_classes and categorical_vocabulary_sizes
     num_classes = df[y].nunique()
@@ -166,7 +160,7 @@ def train(
         "mode": "min",
         "patience": patience,
     }
-    loss = nn.CrossEntropyLoss() if loss == 'crossentropy' else OneVsAllLoss()
+    loss = nn.CrossEntropyLoss() if loss == "crossentropy" else OneVsAllLoss()
     # Lightning module
     module = FastTextModule(
         model=model,
@@ -224,13 +218,22 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--uri", type=str, help="MLflow tracking URI", default="https://projet-ape-mlflow.user.lab.sspcloud.fr/")
+    parser.add_argument(
+        "--uri",
+        type=str,
+        help="MLflow tracking URI",
+        default="https://projet-ape-mlflow.user.lab.sspcloud.fr/",
+    )
     parser.add_argument("--experiment_name", type=str, help="MLflow experiment name", default=None)
     parser.add_argument("--run_name", type=str, help="MLflow run name", default=None)
 
-    parser.add_argument("--loss", type=str, help="Loss function", default="crossentropy",
-                        choices=["crossentropy", "ova"]
-                        )
+    parser.add_argument(
+        "--loss",
+        type=str,
+        help="Loss function",
+        default="crossentropy",
+        choices=["crossentropy", "ova"],
+    )
 
     args = parser.parse_args()
 
@@ -284,7 +287,7 @@ if __name__ == "__main__":
                 "wordNgrams": 3,
                 "sparse": False,
             },
-            loss=loss
+            loss=loss,
         )
         best_model = type(light_module).load_from_checkpoint(
             checkpoint_path=trainer.checkpoint_callback.best_model_path,
@@ -298,6 +301,6 @@ if __name__ == "__main__":
         )
         mlflow.pytorch.log_model(
             artifact_path="model",
-            code_paths=["src/models/", "src/config/",  "src/explainability/", "src/tokenizer/"],
-            pytorch_model=best_model.to("cpu")
+            code_paths=["src/models/", "src/config/", "src/explainability/", "src/tokenizer/"],
+            pytorch_model=best_model.to("cpu"),
         )

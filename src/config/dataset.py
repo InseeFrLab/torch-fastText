@@ -1,6 +1,7 @@
 """
 Dataset class for a FastTextModel without the fastText dependency.
 """
+
 from typing import List, Tuple
 import torch
 import numpy as np
@@ -64,9 +65,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             List[int, str]: Observation with given index.
         """
-        categorical_variables = [
-            variable[index] for variable in self.categorical_variables
-        ]
+        categorical_variables = [variable[index] for variable in self.categorical_variables]
         text = self.texts[index]
         y = self.outputs[index]
         return [text, *categorical_variables, y]
@@ -83,7 +82,9 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         """
         # Get inputs
         text = [item[0] for item in batch]
-        categorical_variables = [[item[1 + i] for item in batch] for i in range(len(self.categorical_variables))]
+        categorical_variables = [
+            [item[1 + i] for item in batch] for i in range(len(self.categorical_variables))
+        ]
         y = [item[-1] for item in batch]
 
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
@@ -93,7 +94,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         padded_batch = torch.nn.utils.rnn.pad_sequence(
             [torch.LongTensor(indices) for indices in indices_batch],
             batch_first=True,
-            padding_value=padding_index
+            padding_value=padding_index,
         )
 
         categorical_tensors = [torch.LongTensor(variable) for variable in categorical_variables]

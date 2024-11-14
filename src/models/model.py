@@ -2,26 +2,32 @@
 FastText model implemented with Pytorch.
 Integrates additional categorical features.
 """
+
 from typing import List
 import torch
 import torch.nn.functional as F
-import pandas as pd # à virer
+import pandas as pd  # à virer
 import numpy as np
 from torchmetrics import Accuracy
 from torch import nn
 import pytorch_lightning as pl
 from scipy.special import softmax
-from captum.attr import IntegratedGradients, LayerIntegratedGradients #
+from captum.attr import IntegratedGradients, LayerIntegratedGradients
 from scipy.special import softmax
 
 from config.preprocess import clean_text_feature
-from explainability.utils import tokenized_text_in_tokens, \
-                                 map_processed_to_original, compute_preprocessed_word_score, \
-                                 compute_word_score, preprocess_token, explain_continuous
-
+from explainability.utils import (
+    tokenized_text_in_tokens,
+    map_processed_to_original,
+    compute_preprocessed_word_score,
+    compute_word_score,
+    preprocess_token,
+    explain_continuous,
+)
 
 
 import time
+
 
 class FastTextModel(nn.Module):
     """
@@ -38,7 +44,7 @@ class FastTextModel(nn.Module):
         categorical_vocabulary_sizes: List[int],
         padding_idx: int = 0,
         sparse: bool = True,
-        direct_bagging:bool = False
+        direct_bagging: bool = False,
     ):
         """
         Constructor for the FastTextModel class.
@@ -64,16 +70,17 @@ class FastTextModel(nn.Module):
         self.vocab_size = vocab_size
         self.sparse = sparse
 
-        self.embeddings = nn.Embedding(
-            embedding_dim=embedding_dim,
-            num_embeddings=vocab_size,
-            padding_idx=padding_idx,
-            sparse=sparse,
-        ) if not direct_bagging else nn.EmbeddingBag(
-            embedding_dim=embedding_dim,
-            num_embeddings=vocab_size,
-            sparse=sparse,
-            mode='mean'
+        self.embeddings = (
+            nn.Embedding(
+                embedding_dim=embedding_dim,
+                num_embeddings=vocab_size,
+                padding_idx=padding_idx,
+                sparse=sparse,
+            )
+            if not direct_bagging
+            else nn.EmbeddingBag(
+                embedding_dim=embedding_dim, num_embeddings=vocab_size, sparse=sparse, mode="mean"
+            )
         )
 
         self.categorical_embeddings = {}
@@ -106,15 +113,13 @@ class FastTextModel(nn.Module):
         # Embed tokens + averaging = sentence embedding if direct_bagging
         # No averaging if direct_bagging
         x_1 = self.embeddings(x_1)
-        #(batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
+        # (batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
 
         # Embed categorical variables
         x_cat = []
-        for i, (variable, embedding_layer) in enumerate(
-            self.categorical_embeddings.items()
-        ):  
+        for i, (variable, embedding_layer) in enumerate(self.categorical_embeddings.items()):
             x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
-        
+
         if not self.direct_bagging:
             # Aggregate the embeddings of the text tokens
             non_zero_tokens = x_1.sum(-1) != 0
@@ -124,13 +129,13 @@ class FastTextModel(nn.Module):
             x_1 = torch.nan_to_num(x_1)
 
         # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
-        x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0) 
-        
+        x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+
         # Linear layer
-        z = self.fc(x_in) #(batch_size, num_classes)
+        z = self.fc(x_in)  # (batch_size, num_classes)
         return z
-    
-    def predict(self, text: List[str], params:dict[str, any] = None, top_k = 1, explain = False):
+
+    def predict(self, text: List[str], params: dict[str, any] = None, top_k=1, explain=False):
         """
         Args:
             text (List[str]): A list of text observations.
@@ -155,40 +160,49 @@ class FastTextModel(nn.Module):
 
         if explain:
             if self.direct_bagging:
-
                 # Get back the classical embedding layer for exaplainability
                 new_embed_layer = nn.Embedding(
                     embedding_dim=self.embedding_dim,
                     num_embeddings=self.vocab_size,
                     padding_idx=self.padding_idx,
                     sparse=self.sparse,
-                    )
-                new_embed_layer.load_state_dict(self.embeddings.state_dict()) # No issues, as exactly the same parameters
+                )
+                new_embed_layer.load_state_dict(
+                    self.embeddings.state_dict()
+                )  # No issues, as exactly the same parameters
                 self.embeddings = new_embed_layer
-                self.direct_bagging = False # To inform the forward pass that we are not using EmbeddingBag anymore
+                self.direct_bagging = (
+                    False  # To inform the forward pass that we are not using EmbeddingBag anymore
+                )
 
-            lig = LayerIntegratedGradients(self, self.embeddings) # initialize a Captum layer gradient integrator
+            lig = LayerIntegratedGradients(
+                self, self.embeddings
+            )  # initialize a Captum layer gradient integrator
 
         self.eval()
         batch_size = len(text)
         params["text"] = text
-        
+
         df = pd.DataFrame(params)
-        df = clean_text_feature(df, text_feature="text") # preprocess text
+        df = clean_text_feature(df, text_feature="text")  # preprocess text
 
         indices_batch = []
         id_to_token_dicts = []
         token_to_id_dicts = []
 
         for sentence in df.text:
-            all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(sentence) # tokenize and convert to token indices
+            all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(
+                sentence
+            )  # tokenize and convert to token indices
             indices_batch.append(all_ind)
             id_to_token_dicts.append(id_to_token)
             token_to_id_dicts.append(token_to_id)
 
         max_tokens = max([len(indices) for indices in indices_batch])
 
-        padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords() # padding index, the integer value of the padding token
+        padding_index = (
+            self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
+        )  # padding index, the integer value of the padding token
         padded_batch = [
             np.pad(
                 indices,
@@ -199,38 +213,57 @@ class FastTextModel(nn.Module):
             for indices in indices_batch
         ]
         padded_batch = np.stack(padded_batch)
-        
-        x = torch.LongTensor(padded_batch.astype(np.int32)).reshape(batch_size, -1)  # (batch_size, seq_len) - Tokenized (int) + padded text
+
+        x = torch.LongTensor(padded_batch.astype(np.int32)).reshape(
+            batch_size, -1
+        )  # (batch_size, seq_len) - Tokenized (int) + padded text
 
         other_features = []
         for key in params.keys():
             if key != "text":
-                other_features.append(torch.tensor(params[key]).reshape(batch_size, -1).to(torch.int64))
-        
+                other_features.append(
+                    torch.tensor(params[key]).reshape(batch_size, -1).to(torch.int64)
+                )
+
         other_features = torch.stack(other_features).reshape(batch_size, -1).long()
 
-        pred = self(x, other_features) # forward pass, contains the prediction scores (len(text), num_classes)
+        pred = self(
+            x, other_features
+        )  # forward pass, contains the prediction scores (len(text), num_classes)
         label_scores = pred.detach().cpu().numpy()
-        top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:] 
+        top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:]
         if explain:
             assert not self.direct_bagging, "Direct bagging should be False for explainability"
             all_attributions = []
             for k in range(top_k):
-                attributions = lig.attribute((x, other_features), target=torch.Tensor(top_k_indices[:, k]).long()) # (batch_size, seq_len)
+                attributions = lig.attribute(
+                    (x, other_features), target=torch.Tensor(top_k_indices[:, k]).long()
+                )  # (batch_size, seq_len)
                 attributions = attributions.sum(dim=-1)
                 all_attributions.append(attributions.detach().cpu())
-            all_attributions = torch.stack(all_attributions, dim = 1) # (batch_size, top_k, seq_len)
+            all_attributions = torch.stack(all_attributions, dim=1)  # (batch_size, top_k, seq_len)
 
-        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(2) # get the top_k most likely predictions
-        predictions = np.empty((batch_size, top_k)).astype('str')
+        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(
+            2
+        )  # get the top_k most likely predictions
+        predictions = np.empty((batch_size, top_k)).astype("str")
 
         for idx in range(batch_size):
-            predictions[idx] = self.nace_encoder.inverse_transform(top_k_indices[idx]) # convert the indices to the corresponding NACE codes (str)
-        
+            predictions[idx] = self.nace_encoder.inverse_transform(
+                top_k_indices[idx]
+            )  # convert the indices to the corresponding NACE codes (str)
+
         if explain:
-            
-            return predictions, confidence, all_attributions, x, id_to_token_dicts, \
-                   token_to_id_dicts, df.text, label_scores
+            return (
+                predictions,
+                confidence,
+                all_attributions,
+                x,
+                id_to_token_dicts,
+                token_to_id_dicts,
+                df.text,
+                label_scores,
+            )
         else:
             return predictions, confidence, label_scores
 
@@ -243,7 +276,7 @@ class FastTextModel(nn.Module):
             top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
             n (int): mapping processed to original words: max number of candidate processed words to consider per original word (default: 5)
             cutoff (float): mapping processed to original words: minimum similarity score to consider a candidate processed word (default: 0.75)
-        
+
         Returns:
             predictions (np.ndarray): A numpy array containing the top_k most likely codes to the query.
             confidence (np.ndarray): A numpy array containing the corresponding confidence scores.
@@ -251,29 +284,49 @@ class FastTextModel(nn.Module):
         """
 
         # Step 1: Get the predictions, confidence scores and attributions at token level
-        pred, confidence, all_attr, tokenized_text, id_to_token_dicts, token_to_id_dicts, \
-            processed_text, _ = self.predict(text=text, params=params, top_k=top_k, explain=True)
+        (
+            pred,
+            confidence,
+            all_attr,
+            tokenized_text,
+            id_to_token_dicts,
+            token_to_id_dicts,
+            processed_text,
+            _,
+        ) = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
         assert self.direct_bagging == False, "Direct bagging should be False for explainability"
 
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
 
         # Step 2: Map the attributions at token level to the processed words
-        processed_word_to_score_dicts, processed_word_to_token_idx_dicts = \
+        processed_word_to_score_dicts, processed_word_to_token_idx_dicts = (
             compute_preprocessed_word_score(
-                            processed_text, tokenized_text_tokens,
-                            all_attr, id_to_token_dicts, token_to_id_dicts,
-                            padding_index=2009603, end_of_string_index=0
-                            )
+                processed_text,
+                tokenized_text_tokens,
+                all_attr,
+                id_to_token_dicts,
+                token_to_id_dicts,
+                padding_index=2009603,
+                end_of_string_index=0,
+            )
+        )
 
         # Step 3: Map the processed words to the original words
-        all_scores, orig_to_processed_mappings = compute_word_score(processed_word_to_score_dicts, text, n=n, cutoff=cutoff)
+        all_scores, orig_to_processed_mappings = compute_word_score(
+            processed_word_to_score_dicts, text, n=n, cutoff=cutoff
+        )
 
         # Step 2bis: Get the attributions at letter level
         all_scores_letters = explain_continuous(
-            text, processed_text, tokenized_text_tokens, orig_to_processed_mappings,
-            processed_word_to_token_idx_dicts, all_attr, top_k
-                                                     )
+            text,
+            processed_text,
+            tokenized_text_tokens,
+            orig_to_processed_mappings,
+            processed_word_to_token_idx_dicts,
+            all_attr,
+            top_k,
+        )
 
         return pred, confidence, all_scores, all_scores_letters
 
@@ -309,10 +362,7 @@ class FastTextModule(pl.LightningModule):
 
         self.model = model
         self.loss = loss
-        self.accuracy_fn = Accuracy(
-            task="multiclass",
-            num_classes=self.model.num_classes
-        )
+        self.accuracy_fn = Accuracy(task="multiclass", num_classes=self.model.num_classes)
         self.optimizer = optimizer
         self.optimizer_params = optimizer_params
         self.scheduler = scheduler
@@ -330,9 +380,7 @@ class FastTextModule(pl.LightningModule):
         """
         return self.model(inputs[0], inputs[1])
 
-    def training_step(
-        self, batch: List[torch.LongTensor], batch_idx: int
-    ) -> torch.Tensor:
+    def training_step(self, batch: List[torch.LongTensor], batch_idx: int) -> torch.Tensor:
         """
         Training step.
 
@@ -365,7 +413,7 @@ class FastTextModule(pl.LightningModule):
         self.log("validation_loss", loss, on_epoch=True)
 
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log('validation_accuracy', accuracy, on_epoch=True)
+        self.log("validation_accuracy", accuracy, on_epoch=True)
         return loss
 
     def test_step(self, batch: List[torch.LongTensor], batch_idx: int):
@@ -400,4 +448,3 @@ class FastTextModule(pl.LightningModule):
         }
 
         return [optimizer], [scheduler]
-
