@@ -58,7 +58,7 @@ class FastTextModel(nn.Module):
         self.tokenizer = tokenizer
         self.nace_encoder = nace_encoder
         self.embedding_dim = embedding_dim
-        self.embeddings = nn.Embedding(
+        self.embeddings = nn.EmbeddingBag(
             embedding_dim=embedding_dim,
             num_embeddings=vocab_size,
             padding_idx=padding_idx,
@@ -84,14 +84,13 @@ class FastTextModel(nn.Module):
             torch.Tensor: Model output: score for each class.
         """
 
-
         x_1 = encoded_text
 
         if x_1.dtype != torch.long:
             x_1 = x_1.long()
 
-        # Embed tokens
-        x_1 = self.embeddings(x_1) # (batch_size, seq_len, embedding_dim)
+        # Embed tokens + averaging = sentence embedding
+        x_1 = self.embeddings(x_1) # (batch_size, embedding_dim)
 
         # Embed categorical variables
         x_cat = []
@@ -99,18 +98,10 @@ class FastTextModel(nn.Module):
             self.categorical_embeddings.items()
         ):
             x_cat.append(embedding_layer(additional_inputs[i].long()).squeeze())
-
-        # Aggregating (via averaging) the embeddings of each sequence 
-        non_zero_tokens = x_1.sum(-1) != 0
-        non_zero_tokens = non_zero_tokens.sum(-1)
-        x_1 = x_1.sum(dim=-2)
-        x_1 /= non_zero_tokens.unsqueeze(-1)
-        x_1 = torch.nan_to_num(x_1) # (batch_size, embedding_dim)
         
         # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
         x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0) 
         
-
         # Linear layer
         z = self.fc(x_in) #(batch_size, num_classes)
         return z
