@@ -3,6 +3,7 @@ Train the fastText model implemented with Pytorch.
 """
 
 import sys
+import os
 import s3fs
 import argparse
 from typing import List, Optional, Dict
@@ -17,6 +18,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import mlflow
 import pyarrow.parquet as pq
+import time
 
 from pytorch_lightning.callbacks import (
     EarlyStopping,
@@ -135,8 +137,8 @@ def train(
     # Compute num_classes and categorical_vocabulary_sizes
     num_classes = df[y].nunique()
     categorical_vocabulary_sizes = [
-        len(np.unique(X_train[feature])) for feature in categorical_features
-    ]
+                                    np.max(X_train[feature]) for feature in categorical_features
+                                    ]
     # Model
     model = FastTextModel(
         tokenizer=tokenizer,
@@ -243,9 +245,10 @@ if __name__ == "__main__":
     loss = args.loss
 
     # Load data
-    fs = s3fs.S3FileSystem(
-        client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"}
-    )
+    print('Loading data...', end='')
+    start = time.time()
+    fs = s3fs.S3FileSystem(client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"},
+                        key= os.environ["AWS_ACCESS_KEY_ID"], secret=os.environ["AWS_SECRET_ACCESS_KEY"])
     df = (
         pq.ParquetDataset(
             "projet-ape/extractions/20241027_sirene4.parquet",
@@ -254,10 +257,11 @@ if __name__ == "__main__":
         .read_pandas()
         .to_pandas()
     )
-    # Subset of df to keep things short
-    # df = df.sample(frac=0.1)
+    end = time.time()
+    print(f'Data loaded. Time: {round(end-start, 2)} s.')
 
     # Clean text feature
+    print('Cleaning text feature...')
     df = clean_text_feature(df, text_feature="libelle")
 
     # Add fictitious additional variable
@@ -265,10 +269,18 @@ if __name__ == "__main__":
     encoder = LabelEncoder()
     df["apet_finale"] = encoder.fit_transform(df["apet_finale"])
 
+    df, les = clean_and_tokenize_df(df)
+
+
     # Start MLflow run
     mlflow.set_tracking_uri(remote_server_uri)
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run(run_name=run_name):
+        
+        # log les to mlflow
+        for i, le in enumerate(les):
+            mlflow.log_param(f"le_{i}", le.classes_)
+        # Train
         trainer, light_module = train(
             df=df,
             y="apet_finale",

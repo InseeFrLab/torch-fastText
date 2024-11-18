@@ -103,8 +103,9 @@ class FastTextModel(nn.Module):
             torch.Tensor: Model output: score for each class.
         """
 
-        batch_size = encoded_text.shape[0]
-        additional_inputs = torch.vstack(additional_inputs).reshape(batch_size, -1)
+        batch_size = encoded_text.shape[0] 
+
+        additional_inputs = torch.vstack(additional_inputs).T # (batch_size, num_categorical_features)
         x_1 = encoded_text
 
         if x_1.dtype != torch.long:
@@ -390,8 +391,8 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
-        inputs, targets = batch[:-1], batch[-1]
-        outputs = self.forward(inputs)
+        text, add_inputs, targets = batch[0], batch[1:-1], batch[-1]
+        outputs = self.forward(text, add_inputs)
         loss = self.loss(outputs, targets)
         self.log("train_loss", loss, on_epoch=True)
 
@@ -407,8 +408,8 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
-        inputs, targets = batch[:-1], batch[-1]
-        outputs = self.forward(inputs)
+        text, add_inputs, targets = batch[0], batch[1:-1], batch[-1]
+        outputs = self.forward(text, add_inputs)
         loss = self.loss(outputs, targets)
         self.log("validation_loss", loss, on_epoch=True)
 
@@ -426,8 +427,8 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
-        inputs, targets = batch[:-1], batch[-1]
-        outputs = self.forward(inputs)
+        text, add_inputs, targets = batch[0], batch[1:-1], batch[-1]
+        outputs = self.forward(text, add_inputs)
         loss = self.loss(outputs, targets)
         self.log("test_loss", loss, on_epoch=True)
 
