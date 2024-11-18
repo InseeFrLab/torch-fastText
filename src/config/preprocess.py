@@ -8,6 +8,7 @@ import unidecode
 from nltk.corpus import stopwords as ntlk_stopwords
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.preprocessing import LabelEncoder
+import numpy as np
 
 
 def clean_text_feature(df: pd.DataFrame, text_feature: str) -> pd.DataFrame:
@@ -88,7 +89,7 @@ def clean_text_input(text: list[str]) -> pd.DataFrame:
             [
                 stemmer.stem(word)
                 for word in libs_token[i]
-                # if word not in stopwords
+                if word not in stopwords
             ]
         )
         for i in range(len(libs_token))
@@ -144,33 +145,27 @@ def categorize_surface(
     df_copy = df_copy.drop(columns=["surf_log", "surf_cat"], errors="ignore")
     return df_copy
 
-def clean_and_tokenize_df(df):
-    df.fillna("nan", inplace=True)
-    df = df.rename(
-    columns={
-        "evenement_type": "EVT",
-        "cj": "CJ",
-        "activ_nat_et": "NAT",
-        "liasse_type": "TYP",
-        "activ_surf_et": "SRF",
-        "activ_perm_et": "CRT",
-    }
-    )
 
-    y = "apet_finale"
-    text_feature = "libelle"
-    categorical_features = ["EVT", "CJ", "NAT", "TYP", "CRT", "SRF"]
-    cj_mapping = {df["CJ"].unique()[i]: i for i in range(df["CJ"].nunique())}
-    evt_mapping = {df["EVT"].unique()[i]: i for i in range(df["EVT"].nunique())}
-    nat_mapping = {df["NAT"].unique()[i]: i for i in range(df["NAT"].nunique())}
-    typ_mapping = {df["TYP"].unique()[i]: i for i in range(df["TYP"].nunique())}
-    crt_mapping = {df["CRT"].unique()[i]: i for i in range(df["CRT"].nunique())}
-    df["CJ"] = df["CJ"].map(cj_mapping)
-    df["EVT"] = df["EVT"].map(evt_mapping)
-    df["NAT"] = df["NAT"].map(nat_mapping)
-    df["TYP"] = df["TYP"].map(typ_mapping)
-    df["CRT"] = df["CRT"].map(crt_mapping)
+def clean_and_tokenize_df(df, categorical_features= ["EVT", "CJ", "NAT", "TYP", "CRT"]):
+    df.fillna("nan", inplace=True)
+
+    df = df.rename(
+                    columns={
+                        "evenement_type": "EVT",
+                        "cj": "CJ",
+                        "activ_nat_et": "NAT",
+                        "liasse_type": "TYP",
+                        "activ_surf_et": "SRF",
+                        "activ_perm_et": "CRT",
+                    }
+                    )
+
+    les = []
+    for col in categorical_features:
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col])
+        les.append(le)
 
     df = categorize_surface(df, "SRF", like_sirene_3=True)
 
-    return df, cj_mapping, evt_mapping, nat_mapping, typ_mapping, crt_mapping
+    return df, les

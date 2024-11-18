@@ -104,7 +104,7 @@ class FastTextModel(nn.Module):
         """
 
         batch_size = encoded_text.shape[0]
-        additional_inputs = additional_inputs.reshape(batch_size, -1)
+        additional_inputs = torch.vstack(additional_inputs).reshape(batch_size, -1)
         x_1 = encoded_text
 
         if x_1.dtype != torch.long:

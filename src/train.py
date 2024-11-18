@@ -25,7 +25,7 @@ from pytorch_lightning.callbacks import (
 )
 
 
-from config.preprocess import clean_text_feature
+from config.preprocess import clean_text_feature, clean_and_tokenize_df
 from config.dataset import FastTextModelDataset
 from tokenizer.tokenizer import NGramTokenizer
 from models.model import FastTextModule, FastTextModel
@@ -244,11 +244,11 @@ if __name__ == "__main__":
 
     # Load data
     fs = s3fs.S3FileSystem(
-        client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"}, anon=True
+        client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"}
     )
     df = (
         pq.ParquetDataset(
-            "projet-formation/diffusion/mlops/data/firm_activity_data.parquet",
+            "projet-ape/extractions/20241027_sirene4.parquet",
             filesystem=fs,
         )
         .read_pandas()
@@ -256,13 +256,14 @@ if __name__ == "__main__":
     )
     # Subset of df to keep things short
     # df = df.sample(frac=0.1)
+
     # Clean text feature
-    df = clean_text_feature(df, text_feature="text")
+    df = clean_text_feature(df, text_feature="libelle")
+
     # Add fictitious additional variable
-    df["additional_var"] = np.random.randint(0, 2, df.shape[0])
     # Encode classes
     encoder = LabelEncoder()
-    df["nace"] = encoder.fit_transform(df["nace"])
+    df["apet_finale"] = encoder.fit_transform(df["apet_finale"])
 
     # Start MLflow run
     mlflow.set_tracking_uri(remote_server_uri)
@@ -270,9 +271,9 @@ if __name__ == "__main__":
     with mlflow.start_run(run_name=run_name):
         trainer, light_module = train(
             df=df,
-            y="nace",
-            text_feature="text",
-            categorical_features=["additional_var"],
+            y="apet_finale",
+            text_feature="libelle",
+            categorical_features=["EVT", "CJ", "NAT", "TYP", "CRT", "SRF"],
             params={
                 "max_epochs": 1,
                 "patience": 3,
