@@ -379,7 +379,7 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Prediction.
         """
-        return self.model(inputs[0], inputs[1])
+        return self.model(inputs[0], inputs[1:])
 
     def training_step(self, batch: List[torch.LongTensor], batch_idx: int) -> torch.Tensor:
         """
@@ -391,8 +391,8 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
-        text, add_inputs, targets = batch[0], batch[1:-1], batch[-1]
-        outputs = self.forward(text, add_inputs)
+        inputs, targets = batch[:-1], batch[-1]
+        outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
         self.log("train_loss", loss, on_epoch=True)
 
@@ -408,8 +408,8 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
-        text, add_inputs, targets = batch[0], batch[1:-1], batch[-1]
-        outputs = self.forward(text, add_inputs)
+        inputs, targets = batch[:-1], batch[-1]
+        outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
         self.log("validation_loss", loss, on_epoch=True)
 
@@ -427,8 +427,8 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
-        text, add_inputs, targets = batch[0], batch[1:-1], batch[-1]
-        outputs = self.forward(text, add_inputs)
+        inputs, targets = batch[:-1], batch[-1]
+        outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
         self.log("test_loss", loss, on_epoch=True)
 

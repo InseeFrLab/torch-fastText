@@ -244,6 +244,7 @@ if __name__ == "__main__":
     run_name = args.run_name
     loss = args.loss
 
+    print("GPU available ? ", torch.cuda.is_available())
     # Load data
     print('Loading data...', end='')
     start = time.time()
@@ -261,15 +262,23 @@ if __name__ == "__main__":
     print(f'Data loaded. Time: {round(end-start, 2)} s.')
 
     # Clean text feature
-    print('Cleaning text feature...')
+    print('Cleaning text feature...', end='')
+    start = time.time()
     df = clean_text_feature(df, text_feature="libelle")
+    end = time.time()
+    print(f'Text cleaned. Time: {round(end-start, 2)} s.')
+
 
     # Add fictitious additional variable
     # Encode classes
     encoder = LabelEncoder()
     df["apet_finale"] = encoder.fit_transform(df["apet_finale"])
 
+    print('Tokenizing categroical variables...', end='')
+    start = time.time()
     df, les = clean_and_tokenize_df(df)
+    end = time.time()
+    print(f'Categorical variables handled. Time: {round(end-start, 2)} s.')
 
 
     # Start MLflow run
@@ -278,9 +287,12 @@ if __name__ == "__main__":
     with mlflow.start_run(run_name=run_name):
         
         # log les to mlflow
+        print("Logging categorical variables mappings...", end = '')
         for i, le in enumerate(les):
             mlflow.log_param(f"le_{i}", le.classes_)
         # Train
+        print("Done.")
+        print("Starting training !")
         trainer, light_module = train(
             df=df,
             y="apet_finale",
