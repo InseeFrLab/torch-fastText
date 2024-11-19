@@ -337,8 +337,9 @@ def explain_continuous(
         for k in range(top_k):
             all_scores_letter = []
             for xxx, original_word in enumerate(original_words):
-                original_word_prepro = clean_text_feature(
-                    [original_word], remove_stop_words=False)[0]
+                original_word_prepro = clean_text_feature([original_word], remove_stop_words=False)[
+                    0
+                ]
 
                 letters = list(original_word)
                 scores_letter = np.zeros(len(letters))

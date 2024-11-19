@@ -23,8 +23,6 @@ from explainability.utils import (
     preprocess_token,
     explain_continuous,
 )
-
-
 import time
 
 
@@ -110,27 +108,27 @@ class FastTextModel(nn.Module):
 
         # Embed tokens + averaging = sentence embedding if direct_bagging
         # No averaging if direct_bagging (handled directly by EmbeddingBag)
-        x_1 = self.embeddings(x_1) # (batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
-        
+        x_1 = self.embeddings(
+            x_1
+        )  # (batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
+
         if not self.direct_bagging:
             # Aggregate the embeddings of the text tokens
             non_zero_tokens = x_1.sum(-1) != 0
             non_zero_tokens = non_zero_tokens.sum(-1)
-            x_1 = x_1.sum(dim=-2) # (batch_size, embedding_dim)
+            x_1 = x_1.sum(dim=-2)  # (batch_size, embedding_dim)
             x_1 /= non_zero_tokens.unsqueeze(-1)
             x_1 = torch.nan_to_num(x_1)
-        
 
         # Embed categorical variables
         x_cat = []
         for i, (variable, embedding_layer) in enumerate(self.categorical_embeddings.items()):
             x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
-        
-        if len(x_cat) > 0: # if there are categorical variables
 
+        if len(x_cat) > 0:  # if there are categorical variables
             # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
             x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
-       
+
         else:
             x_in = x_1
 

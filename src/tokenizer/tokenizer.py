@@ -59,6 +59,7 @@ class NGramTokenizer:
                 i += 1
         self.nwords = len(self.word_id_mapping)
 
+
     def get_nwords(self) -> int:
         """
         Return number of words kept in training data.
