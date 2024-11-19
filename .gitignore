@@ -168,4 +168,4 @@ data/training_data.txt
 # Docs
 docs/
 fastTextAttention.py
-src/model.pth
+*.pth

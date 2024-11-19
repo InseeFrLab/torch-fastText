@@ -11,7 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 import numpy as np
 
 
-def clean_text_feature(df: pd.DataFrame, text_feature: str) -> pd.DataFrame:
+def clean_text_feature(text: list[str], remove_stop_words=True) -> pd.DataFrame:
     """
     Cleans a text feature for pd.DataFrame `df`.
 
@@ -27,76 +27,34 @@ def clean_text_feature(df: pd.DataFrame, text_feature: str) -> pd.DataFrame:
     stemmer = SnowballStemmer(language="french")
 
     # Remove of accented characters
-    df[text_feature] = df[text_feature].map(unidecode.unidecode)
+    text = np.vectorize(unidecode.unidecode)(np.array(text))
 
     # To lowercase
-    df[text_feature] = df[text_feature].str.lower()
+    text = np.char.lower(text)
 
     # Remove one letter words
-    df[text_feature] = df[text_feature].apply(
-        lambda x: " ".join([w for w in x.split() if len(w) > 1])
-    )
+    mylambda = lambda x: " ".join([w for w in x.split() if len(w) > 1])
+    text = np.vectorize(mylambda)(text)
 
     # Remove duplicate words and stopwords in texts
     # Stem words
-    libs_token = [lib.split() for lib in df[text_feature].to_list()]
+    libs_token = [lib.split() for lib in text.tolist()]
     libs_token = [
         sorted(set(libs_token[i]), key=libs_token[i].index) for i in range(len(libs_token))
     ]
-    df[text_feature] = [
-        " ".join([stemmer.stem(word) for word in libs_token[i] if word not in stopwords])
-        for i in range(len(libs_token))
-    ]
-
-    # Return clean DataFrame
-    return df
-
-
-def clean_text_input(text: list[str]) -> pd.DataFrame:
-    """
-    Cleans a text feature for pd.DataFrame `df`.
-
-    Args:
-        df (pd.DataFrame): DataFrame.
-        text_feature (str): Name of the text feature.
-
-    Returns:
-        df (pd.DataFrame): DataFrame.
-    """
-
-    text = pd.Series(text)
-    # Define stopwords and stemmer
-    stopwords = tuple(ntlk_stopwords.words("french")) + tuple(string.ascii_lowercase)
-    stemmer = SnowballStemmer(language="french")
-
-    # Remove of accented characters
-    text = text.map(unidecode.unidecode)
-
-    # To lowercase
-    text = text.str.lower()
-
-    # Remove one letter words
-    text = text.apply(lambda x: " ".join([w for w in x.split() if len(w) > 1]))
-
-    # Remove duplicate words and stopwords in texts
-    # Stem words
-    libs_token = [lib.split() for lib in text.to_list()]
-    libs_token = [
-        sorted(set(libs_token[i]), key=libs_token[i].index) for i in range(len(libs_token))
-    ]
-    text = [
-        " ".join(
-            [
-                stemmer.stem(word)
-                for word in libs_token[i]
-                if word not in stopwords
-            ]
-        )
-        for i in range(len(libs_token))
-    ]
+    if remove_stop_words:
+        text = [
+            " ".join([stemmer.stem(word) for word in libs_token[i] if word not in stopwords])
+            for i in range(len(libs_token))
+        ]
+    else:
+        text = [
+            " ".join([stemmer.stem(word) for word in libs_token[i]]) for i in range(len(libs_token))
+        ]
 
     # Return clean DataFrame
     return text
+
 
 def categorize_surface(
     df: pd.DataFrame, surface_feature_name: int, like_sirene_3: bool = True
@@ -146,19 +104,19 @@ def categorize_surface(
     return df_copy
 
 
-def clean_and_tokenize_df(df, categorical_features= ["EVT", "CJ", "NAT", "TYP", "CRT"]):
+def clean_and_tokenize_df(df, categorical_features=["EVT", "CJ", "NAT", "TYP", "CRT"]):
     df.fillna("nan", inplace=True)
 
     df = df.rename(
-                    columns={
-                        "evenement_type": "EVT",
-                        "cj": "CJ",
-                        "activ_nat_et": "NAT",
-                        "liasse_type": "TYP",
-                        "activ_surf_et": "SRF",
-                        "activ_perm_et": "CRT",
-                    }
-                    )
+        columns={
+            "evenement_type": "EVT",
+            "cj": "CJ",
+            "activ_nat_et": "NAT",
+            "liasse_type": "TYP",
+            "activ_surf_et": "SRF",
+            "activ_perm_et": "CRT",
+        }
+    )
 
     les = []
     for col in categorical_features:

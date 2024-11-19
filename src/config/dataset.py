@@ -98,9 +98,13 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         )
 
         categorical_tensors = [torch.LongTensor(variable) for variable in categorical_variables]
+        categorical_tensors = torch.vstack(
+            categorical_tensors
+        ).T  # (batch_size, num_categorical_features)
+
         y = torch.LongTensor(y)
 
-        return (padded_batch, *categorical_tensors, y)
+        return (padded_batch, categorical_tensors, y)
 
     def create_dataloader(
         self,

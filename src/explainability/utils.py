@@ -8,7 +8,7 @@ from scipy.special import softmax
 import numpy as np
 import difflib
 from collections import Counter
-from config.preprocess import clean_text_input
+from config.preprocess import clean_text_feature
 import torch
 from difflib import SequenceMatcher
 
@@ -86,7 +86,9 @@ def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.9):
     word_mapping = {}
 
     for original_word in original_words:
-        original_word_prepro = clean_text_input([original_word])[0]  # Preprocess the original word
+        original_word_prepro = clean_text_feature([original_word], remove_stop_words=False)[
+            0
+        ]  # Preprocess the original word
 
         if original_word_prepro == "":
             continue
@@ -145,7 +147,6 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
     pointer_token = 0
     res = {}
     processed_words = sentence.split()
-
     # we know the tokens are in the right order
     for index_word, word in enumerate(sentence.split()):
         if word not in res:
@@ -219,8 +220,6 @@ def compute_preprocessed_word_score(
     word_to_score_dicts = []
     word_to_token_idx_dicts = []
 
-    print(len(tokenized_text_tokens[0]))
-
     for idx, sentence in enumerate(preprocessed_text):
         tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
         word_to_token_idx = match_word_to_token_indexes(sentence, tokenized_sentence_tokens)
@@ -233,8 +232,6 @@ def compute_preprocessed_word_score(
             word_to_score = {word: 0 for word in sentence.split()}
 
             score_sentence = score_sentence_topk[k]
-
-            print(score_sentence.shape)
             for word, associated_token_idx in word_to_token_idx.items():
                 associated_token_idx = torch.tensor(associated_token_idx).int()
                 word_to_score[word] = torch.sum(score_sentence[associated_token_idx]).item()
@@ -271,7 +268,6 @@ def compute_word_score(word_to_score_dicts, text, n=5, cutoff=0.75):
         mapping = map_processed_to_original(
             processed_words, original_words, n=n, cutoff=cutoff
         )  # Dict[str, Tuple[List[str], List[float]]]
-
         mappings.append(mapping)
         for word_to_score in word_to_score_topk:  # iteration over top_k (the preds)
             scores = []
@@ -341,7 +337,9 @@ def explain_continuous(
         for k in range(top_k):
             all_scores_letter = []
             for xxx, original_word in enumerate(original_words):
-                original_word_prepro = clean_text_input([original_word])[0]
+                original_word_prepro = clean_text_feature(
+                    [original_word], remove_stop_words=False)[0]
+
                 letters = list(original_word)
                 scores_letter = np.zeros(len(letters))
 

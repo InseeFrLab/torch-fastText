@@ -136,9 +136,7 @@ def train(
 
     # Compute num_classes and categorical_vocabulary_sizes
     num_classes = df[y].nunique()
-    categorical_vocabulary_sizes = [
-                                    np.max(X_train[feature]) for feature in categorical_features
-                                    ]
+    categorical_vocabulary_sizes = [np.max(X_train[feature]) for feature in categorical_features]
     # Model
     model = FastTextModel(
         tokenizer=tokenizer,
@@ -246,10 +244,13 @@ if __name__ == "__main__":
 
     print("GPU available ? ", torch.cuda.is_available())
     # Load data
-    print('Loading data...', end='')
+    print("Loading data...", end="")
     start = time.time()
-    fs = s3fs.S3FileSystem(client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"},
-                        key= os.environ["AWS_ACCESS_KEY_ID"], secret=os.environ["AWS_SECRET_ACCESS_KEY"])
+    fs = s3fs.S3FileSystem(
+        client_kwargs={"endpoint_url": "https://minio.lab.sspcloud.fr"},
+        key=os.environ["AWS_ACCESS_KEY_ID"],
+        secret=os.environ["AWS_SECRET_ACCESS_KEY"],
+    )
     df = (
         pq.ParquetDataset(
             "projet-ape/extractions/20241027_sirene4.parquet",
@@ -259,35 +260,31 @@ if __name__ == "__main__":
         .to_pandas()
     )
     end = time.time()
-    print(f'Data loaded. Time: {round(end-start, 2)} s.')
+    print(f"Data loaded. Time: {round(end-start, 2)} s.")
 
     # Clean text feature
-    print('Cleaning text feature...', end='')
+    print("Cleaning text feature...", end="")
     start = time.time()
-    df = clean_text_feature(df, text_feature="libelle")
+    df["libelle"] = clean_text_feature(df["libelle"])
     end = time.time()
-    print(f'Text cleaned. Time: {round(end-start, 2)} s.')
+    print(f"Text cleaned. Time: {round(end-start, 2)} s.")
 
-
-    # Add fictitious additional variable
     # Encode classes
     encoder = LabelEncoder()
     df["apet_finale"] = encoder.fit_transform(df["apet_finale"])
 
-    print('Tokenizing categroical variables...', end='')
+    print("Tokenizing categorical variables...", end="")
     start = time.time()
     df, les = clean_and_tokenize_df(df)
     end = time.time()
-    print(f'Categorical variables handled. Time: {round(end-start, 2)} s.')
-
+    print(f"Categorical variables handled. Time: {round(end-start, 2)} s.")
 
     # Start MLflow run
     mlflow.set_tracking_uri(remote_server_uri)
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run(run_name=run_name):
-        
         # log les to mlflow
-        print("Logging categorical variables mappings...", end = '')
+        print("Logging categorical variables mappings...", end="")
         for i, le in enumerate(les):
             mlflow.log_param(f"le_{i}", le.classes_)
         # Train

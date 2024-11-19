@@ -6,7 +6,6 @@ Integrates additional categorical features.
 from typing import List
 import torch
 import torch.nn.functional as F
-import pandas as pd  # à virer
 import numpy as np
 from torchmetrics import Accuracy
 from torch import nn
@@ -97,40 +96,43 @@ class FastTextModel(nn.Module):
 
         Args:
             encoded_text (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized + padded text (in integer (indices))
-            additional_inputs (torch.Tensor[Long]): Additional categorical features.
+            additional_inputs (torch.Tensor[Long]): Additional categorical features, (batch_size , num_categorical_features)
 
         Returns:
             torch.Tensor: Model output: score for each class.
         """
 
-        batch_size = encoded_text.shape[0] 
-
-        additional_inputs = torch.vstack(additional_inputs).T # (batch_size, num_categorical_features)
+        batch_size = encoded_text.shape[0]
         x_1 = encoded_text
 
         if x_1.dtype != torch.long:
             x_1 = x_1.long()
 
         # Embed tokens + averaging = sentence embedding if direct_bagging
-        # No averaging if direct_bagging
-        x_1 = self.embeddings(x_1)
-        # (batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
+        # No averaging if direct_bagging (handled directly by EmbeddingBag)
+        x_1 = self.embeddings(x_1) # (batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
+        
+        if not self.direct_bagging:
+            # Aggregate the embeddings of the text tokens
+            non_zero_tokens = x_1.sum(-1) != 0
+            non_zero_tokens = non_zero_tokens.sum(-1)
+            x_1 = x_1.sum(dim=-2) # (batch_size, embedding_dim)
+            x_1 /= non_zero_tokens.unsqueeze(-1)
+            x_1 = torch.nan_to_num(x_1)
+        
 
         # Embed categorical variables
         x_cat = []
         for i, (variable, embedding_layer) in enumerate(self.categorical_embeddings.items()):
             x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
+        
+        if len(x_cat) > 0: # if there are categorical variables
 
-        if not self.direct_bagging:
-            # Aggregate the embeddings of the text tokens
-            non_zero_tokens = x_1.sum(-1) != 0
-            non_zero_tokens = non_zero_tokens.sum(-1)
-            x_1 = x_1.sum(dim=-2)
-            x_1 /= non_zero_tokens.unsqueeze(-1)
-            x_1 = torch.nan_to_num(x_1)
-
-        # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
-        x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+            # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
+            x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+       
+        else:
+            x_in = x_1
 
         # Linear layer
         z = self.fc(x_in)  # (batch_size, num_classes)
@@ -156,12 +158,12 @@ class FastTextModel(nn.Module):
             x (torch.Tensor): A tensor containing the token indices of the text.
             id_to_token_dicts (List[Dict[int, str]]): A list of dictionaries mapping token indices to tokens (one for each sentence).
             token_to_id_dicts (List[Dict[str, int]]): A list of dictionaries mapping tokens to token indices: the reverse of those in id_to_token_dicts.
-            df.text (pd.Series): A pandas Series containing the preprocessed text (one line for each sentence).
+            text (list[str]): A plist containing the preprocessed text (one line for each sentence).
         """
 
         if explain:
             if self.direct_bagging:
-                # Get back the classical embedding layer for exaplainability
+                # Get back the classical embedding layer for explainability
                 new_embed_layer = nn.Embedding(
                     embedding_dim=self.embedding_dim,
                     num_embeddings=self.vocab_size,
@@ -184,14 +186,13 @@ class FastTextModel(nn.Module):
         batch_size = len(text)
         params["text"] = text
 
-        df = pd.DataFrame(params)
-        df = clean_text_feature(df, text_feature="text")  # preprocess text
+        text = clean_text_feature(text)  # preprocess text
 
         indices_batch = []
         id_to_token_dicts = []
         token_to_id_dicts = []
 
-        for sentence in df.text:
+        for sentence in text:
             all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(
                 sentence
             )  # tokenize and convert to token indices
@@ -262,7 +263,7 @@ class FastTextModel(nn.Module):
                 x,
                 id_to_token_dicts,
                 token_to_id_dicts,
-                df.text,
+                text,
                 label_scores,
             )
         else:
@@ -379,7 +380,7 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Prediction.
         """
-        return self.model(inputs[0], inputs[1:])
+        return self.model(inputs[0], inputs[1])
 
     def training_step(self, batch: List[torch.LongTensor], batch_idx: int) -> torch.Tensor:
         """
