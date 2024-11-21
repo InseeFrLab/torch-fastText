@@ -2,38 +2,34 @@
 Train the fastText model implemented with Pytorch.
 """
 
-import sys
-import os
-import s3fs
 import argparse
-from typing import List, Optional, Dict
-import pytorch_lightning as pl
-import torch
-from torch import nn
-from torch.optim import Adam, SGD
-import torch.nn.functional as F
-import pandas as pd
-import numpy as np
+import os
 import random
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-import mlflow
-import pyarrow.parquet as pq
 import time
+from typing import Dict, List, Optional
 
+import mlflow
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+import pytorch_lightning as pl
+import s3fs
+import torch
+from models.model import FastTextModel, FastTextModule
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
 )
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from torch import nn
+from torch.optim import SGD, Adam
 
-
-from config.preprocess import clean_text_feature, clean_and_tokenize_df
 from config.dataset import FastTextModelDataset
-from tokenizer.tokenizer import NGramTokenizer
-from models.model import FastTextModule, FastTextModel
+from config.preprocess import clean_and_tokenize_df, clean_text_feature
 from losses.ova import OneVsAllLoss
-
+from tokenizer.tokenizer import NGramTokenizer
 
 
 def train(
@@ -104,11 +100,12 @@ def train(
 
     # Compute num_classes and categorical_vocabulary_sizes
     num_classes = df[y].nunique()
-    categorical_vocabulary_sizes = [np.max(X_train[feature]) for feature in categorical_features]
+    categorical_vocabulary_sizes = [
+        np.max(X_train[feature]) + 1 for feature in categorical_features
+    ]
     # Model
     model = FastTextModel(
         tokenizer=tokenizer,
-        nace_encoder=encoder,
         embedding_dim=embedding_dim,
         vocab_size=buckets + tokenizer.get_nwords() + 1,
         num_classes=num_classes,

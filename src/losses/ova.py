@@ -1,6 +1,6 @@
-import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+
 
 class OneVsAllLoss(nn.Module):
     def __init__(self):
@@ -17,7 +17,7 @@ class OneVsAllLoss(nn.Module):
         Returns:
             loss: Mean loss value across the batch
         """
-        batch_size = logits.size(0)
+
         num_classes = logits.size(1)
 
         # Convert targets to one-hot encoding

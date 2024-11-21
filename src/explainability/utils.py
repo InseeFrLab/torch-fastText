@@ -2,15 +2,14 @@
 Utility functions.
 """
 
-import ctypes
-from typing import Tuple
-from scipy.special import softmax
-import numpy as np
 import difflib
-from collections import Counter
-from config.preprocess import clean_text_feature
-import torch
 from difflib import SequenceMatcher
+
+import numpy as np
+import torch
+from scipy.special import softmax
+
+from config.preprocess import clean_text_feature
 
 
 def get_top_tokens(

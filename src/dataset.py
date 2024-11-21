@@ -2,12 +2,11 @@
 Dataset class for a FastTextModel without the fastText dependency.
 """
 
-from typing import List, Tuple
-import torch
-import numpy as np
-from tokenizer.tokenizer import NGramTokenizer
+from typing import List
 
-import time
+import torch
+
+from tokenizer import NGramTokenizer
 
 
 class FastTextModelDataset(torch.utils.data.Dataset):
@@ -88,7 +87,6 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         y = [item[-1] for item in batch]
 
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
-        max_tokens = max(len(indices) for indices in indices_batch)
 
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
         padded_batch = torch.nn.utils.rnn.pad_sequence(

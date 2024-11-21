@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-from explainability.utils import map_processed_to_original
+import seaborn as sns
 
 
 def visualize_word_scores(all_scores, original_texts, pred):

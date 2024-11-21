@@ -4,26 +4,21 @@ Integrates additional categorical features.
 """
 
 from typing import List
-import torch
-import torch.nn.functional as F
+
 import numpy as np
-from torchmetrics import Accuracy
-from torch import nn
 import pytorch_lightning as pl
-from scipy.special import softmax
-from captum.attr import IntegratedGradients, LayerIntegratedGradients
-from scipy.special import softmax
+import torch
+from captum.attr import LayerIntegratedGradients
+from torch import nn
+from torchmetrics import Accuracy
 
 from config.preprocess import clean_text_feature
 from explainability.utils import (
-    tokenized_text_in_tokens,
-    map_processed_to_original,
     compute_preprocessed_word_score,
     compute_word_score,
-    preprocess_token,
     explain_continuous,
+    tokenized_text_in_tokens,
 )
-import time
 
 
 class FastTextModel(nn.Module):
@@ -34,7 +29,6 @@ class FastTextModel(nn.Module):
     def __init__(
         self,
         tokenizer,
-        nace_encoder,
         embedding_dim: int,
         vocab_size: int,
         num_classes: int,
@@ -61,7 +55,6 @@ class FastTextModel(nn.Module):
         self.num_classes = num_classes
         self.padding_idx = padding_idx
         self.tokenizer = tokenizer
-        self.nace_encoder = nace_encoder
         self.embedding_dim = embedding_dim
         self.direct_bagging = direct_bagging
         self.vocab_size = vocab_size
@@ -99,8 +92,6 @@ class FastTextModel(nn.Module):
         Returns:
             torch.Tensor: Model output: score for each class.
         """
-
-        batch_size = encoded_text.shape[0]
         x_1 = encoded_text
 
         if x_1.dtype != torch.long:
@@ -248,11 +239,6 @@ class FastTextModel(nn.Module):
         )  # get the top_k most likely predictions
         predictions = np.empty((batch_size, top_k)).astype("str")
 
-        for idx in range(batch_size):
-            predictions[idx] = self.nace_encoder.inverse_transform(
-                top_k_indices[idx]
-            )  # convert the indices to the corresponding NACE codes (str)
-
         if explain:
             return (
                 predictions,
@@ -295,7 +281,7 @@ class FastTextModel(nn.Module):
             _,
         ) = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
-        assert self.direct_bagging == False, "Direct bagging should be False for explainability"
+        assert not self.direct_bagging, "Direct bagging should be False for explainability"
 
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
 

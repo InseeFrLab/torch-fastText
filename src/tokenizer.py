@@ -2,9 +2,11 @@
 NGramTokenizer class.
 """
 
-import numpy as np
 from typing import List, Tuple
-from tokenizer.utils import get_hash, get_word_ngram_id
+
+import numpy as np
+
+from utils import get_hash, get_word_ngram_id
 
 
 class NGramTokenizer:
@@ -58,7 +60,6 @@ class NGramTokenizer:
                 self.word_id_mapping[word] = i
                 i += 1
         self.nwords = len(self.word_id_mapping)
-
 
     def get_nwords(self) -> int:
         """

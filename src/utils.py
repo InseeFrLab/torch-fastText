@@ -1,6 +1,5 @@
 import ctypes
 from typing import Tuple
-import numpy as np
 
 
 def get_hash(subword: str) -> int:

@@ -3,12 +3,13 @@ Processing fns.
 """
 
 import string
+
+import numpy as np
 import pandas as pd
 import unidecode
 from nltk.corpus import stopwords as ntlk_stopwords
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.preprocessing import LabelEncoder
-import numpy as np
 
 
 def clean_text_feature(text: list[str], remove_stop_words=True) -> pd.DataFrame:
@@ -33,7 +34,10 @@ def clean_text_feature(text: list[str], remove_stop_words=True) -> pd.DataFrame:
     text = np.char.lower(text)
 
     # Remove one letter words
-    mylambda = lambda x: " ".join([w for w in x.split() if len(w) > 1])
+
+    def mylambda(x):
+        return " ".join([w for w in x.split() if len(w) > 1])
+
     text = np.vectorize(mylambda)(text)
 
     # Remove duplicate words and stopwords in texts
