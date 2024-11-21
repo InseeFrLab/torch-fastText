@@ -1,13 +1,11 @@
-"""
-Utility functions.
-"""
 import ctypes
 from typing import Tuple
+import numpy as np
 
 
 def get_hash(subword: str) -> int:
     """
-    Return has for a given subword.
+    Return hash for a given subword.
 
     Args:
         subword (str): Character n-gram.

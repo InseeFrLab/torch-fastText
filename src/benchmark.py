@@ -1,6 +1,7 @@
 """
 Train the fastText model implemented with Pytorch.
 """
+
 from pathlib import Path
 import sys
 import s3fs
@@ -12,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import mlflow
 import pyarrow.parquet as pq
-from preprocess import clean_text_feature
+from config.preprocess import clean_text_feature
 import fasttext
 
 
@@ -124,11 +125,7 @@ def train_fasttext(
     )
 
     # Train the fasttext model
-    model = fasttext.train_supervised(
-        training_data_path,
-        **params,
-        verbose=2
-    )
+    model = fasttext.train_supervised(training_data_path, **params, verbose=2)
 
     # Log parameters
     for param_name, param_value in params.items():
@@ -145,10 +142,7 @@ def train_fasttext(
     predictions = model.predict(val_texts, k=1)
     predictions = [x[0].replace("__label__", "") for x in predictions[0]]
 
-    booleans = [
-        prediction == str(label)
-        for prediction, label in zip(predictions, df_val[y])
-    ]
+    booleans = [prediction == str(label) for prediction, label in zip(predictions, df_val[y])]
     accuracy = sum(booleans) / len(booleans)
 
     # Log accuracy
@@ -188,6 +182,7 @@ if __name__ == "__main__":
     # Start MLflow run
     mlflow.set_tracking_uri(remote_server_uri)
     mlflow.set_experiment(experiment_name)
+    mlflow.pyfunc.autolog()
     with mlflow.start_run(run_name=run_name):
         train_fasttext(
             df=df,
@@ -200,9 +195,9 @@ if __name__ == "__main__":
                 "lr": 0.2,
                 "buckets": 2000000,
                 "dim": 180,
-                "minCount": 3,
+                "minCount": 1,
                 "minn": 3,
-                "maxn": 4,
+                "maxn": 6,
                 "wordNgrams": 3,
             },
         )

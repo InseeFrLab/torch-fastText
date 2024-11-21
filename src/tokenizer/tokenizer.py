@@ -1,9 +1,10 @@
 """
 NGramTokenizer class.
 """
+
 import numpy as np
 from typing import List, Tuple
-from utils import get_hash, get_word_ngram_id
+from tokenizer.utils import get_hash, get_word_ngram_id
 
 
 class NGramTokenizer:
@@ -58,6 +59,7 @@ class NGramTokenizer:
                 i += 1
         self.nwords = len(self.word_id_mapping)
 
+
     def get_nwords(self) -> int:
         """
         Return number of words kept in training data.
@@ -89,7 +91,7 @@ class NGramTokenizer:
         Returns:
             List[str]: List of character n-grams.
         """
-        return [word[i: i + n] for i in range(len(word) - n + 1)]
+        return [word[i : i + n] for i in range(len(word) - n + 1)]
 
     def get_subword_index(self, subword: str) -> int:
         """
@@ -135,12 +137,13 @@ class NGramTokenizer:
 
         # Add word
         try:
-            tokens = [word] + tokens
-            indices = [self.get_word_index(word)] + indices
+            if word not in tokens:
+                indices = [self.get_word_index(word)] + indices
+                tokens = [word] + tokens
+
         except KeyError:
             # print("Token was not in mapping, not adding it to subwords.")
             pass
-
         return (tokens, indices)
 
     def indices_matrix(self, sentence: str) -> np.array:
@@ -156,23 +159,33 @@ class NGramTokenizer:
         indices = []
         words = []
         word_ngram_ids = []
-
+        all_tokens_id = {}
         for word in sentence.split(" "):
-            indices += self.get_subwords(word)[1]
-            words += [word]
+            tokens, ind = self.get_subwords(word)
+            indices += ind
+            for idx, tok in enumerate(tokens):
+                if tok not in all_tokens_id.keys():
+                    all_tokens_id[tok] = ind[idx]
 
+            words += [word]
         # Adding end of string token
         indices += [0]
         words += ["</s>"]
+        all_tokens_id["</s>"] = 0
 
         # Adding word n-grams
         for word_ngram_len in range(2, self.word_ngrams + 1):
             for i in range(len(words) - word_ngram_len + 1):
-                hashes = tuple(get_hash(word) for word in words[i: i + word_ngram_len])
-                word_ngram_id = int(
-                    get_word_ngram_id(hashes, self.buckets, self.nwords)
-                )
+                gram = words[i : i + word_ngram_len]
+                gram = " ".join(gram)
+
+                hashes = tuple(get_hash(word) for word in gram)
+                word_ngram_id = int(get_word_ngram_id(hashes, self.buckets, self.nwords))
+                all_tokens_id[gram] = word_ngram_id
                 word_ngram_ids.append(word_ngram_id)
 
         all_indices = indices + word_ngram_ids
-        return np.asarray(all_indices)
+
+        id_to_token = {v: k for k, v in all_tokens_id.items()}
+
+        return np.asarray(all_indices), id_to_token, all_tokens_id
