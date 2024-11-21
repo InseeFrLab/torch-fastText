@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from dataset import FastTextModelDataset
 from pytorch_model import FastTextModel
@@ -64,6 +65,8 @@ class torchFastText:
         num_workers,
         train_proportion,
         lr,
+        cpu_run=False,
+        verbose=False,
     ):
         assert isinstance(
             X_train, np.ndarray
@@ -82,6 +85,8 @@ class torchFastText:
             )
 
         if self.tokenizer is None or self.pytorch_model is None:
+            if verbose:
+                print("Building the model...")
             self.build(training_text, categorical_variables)
 
         train_dataset = FastTextModelDataset(
@@ -96,6 +101,12 @@ class torchFastText:
             outputs=y_val,
             tokenizer=self.tokenizer,
         )
+
+        if cpu_run:
+            self.device = torch.device("cpu")
+        else:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         # train_dataloader = train_dataset.create_dataloader(
         #     batch_size=batch_size, num_workers=num_workers
         # )
