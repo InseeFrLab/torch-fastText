@@ -6,11 +6,9 @@ Integrates additional categorical features.
 from typing import List
 
 import numpy as np
-import pytorch_lightning as pl
 import torch
 from captum.attr import LayerIntegratedGradients
 from torch import nn
-from torchmetrics import Accuracy
 
 from config.preprocess import clean_text_feature
 from explainability.utils import (
@@ -32,7 +30,7 @@ class FastTextModel(nn.Module):
         embedding_dim: int,
         vocab_size: int,
         num_classes: int,
-        categorical_vocabulary_sizes: List[int],
+        categorical_vocabulary_sizes: List[int] = None,
         padding_idx: int = 0,
         sparse: bool = True,
         direct_bagging: bool = False,
@@ -74,10 +72,14 @@ class FastTextModel(nn.Module):
         )
 
         self.categorical_embeddings = {}
-        for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
-            emb = nn.Embedding(embedding_dim=embedding_dim, num_embeddings=vocab_size)
-            self.categorical_embeddings[var_idx] = emb
-            setattr(self, "emb_{}".format(var_idx), emb)
+        if categorical_vocabulary_sizes is not None:
+            self.no_cat_var = False
+            for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
+                emb = nn.Embedding(embedding_dim=embedding_dim, num_embeddings=vocab_size)
+                self.categorical_embeddings[var_idx] = emb
+                setattr(self, "emb_{}".format(var_idx), emb)
+        else:
+            self.no_cat_var = True
 
         self.fc = nn.Linear(embedding_dim, num_classes)
 
@@ -113,8 +115,9 @@ class FastTextModel(nn.Module):
 
         # Embed categorical variables
         x_cat = []
-        for i, (variable, embedding_layer) in enumerate(self.categorical_embeddings.items()):
-            x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
+        if not self.no_cat_var:
+            for i, (variable, embedding_layer) in enumerate(self.categorical_embeddings.items()):
+                x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
 
         if len(x_cat) > 0:  # if there are categorical variables
             # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
@@ -315,128 +318,3 @@ class FastTextModel(nn.Module):
         )
 
         return pred, confidence, all_scores, all_scores_letters
-
-
-class FastTextModule(pl.LightningModule):
-    """
-    Pytorch Lightning Module for FastTextModel.
-    """
-
-    def __init__(
-        self,
-        model: FastTextModel,
-        loss,
-        self.accuracy_fn = Accuracy(
-            task="multiclass",
-            num_classes=self.model.num_classes
-        )
-        optimizer,
-        optimizer_params,
-        scheduler,
-        scheduler_params,
-        scheduler_interval,
-    ):
-        """
-        Initialize FastTextModule.
-
-        Args:
-            model: Model.
-            loss: Loss
-            optimizer: Optimizer
-            optimizer_params: Optimizer parameters.
-            scheduler: Scheduler.
-            scheduler_params: Scheduler parameters.
-            scheduler_interval: Scheduler interval.
-        """
-        super().__init__()
-
-        self.model = model
-        self.loss = loss
-        self.accuracy_fn = Accuracy(task="multiclass", num_classes=self.model.num_classes)
-        self.optimizer = optimizer
-        self.optimizer_params = optimizer_params
-        self.scheduler = scheduler
-        self.scheduler_params = scheduler_params
-        self.scheduler_interval = scheduler_interval
-
-    def forward(self, inputs: List[torch.LongTensor]) -> torch.Tensor:
-        """
-        Perform forward-pass.
-
-        Args:
-            batch (List[torch.LongTensor]): Batch to perform forward-pass on.
-
-        Returns (torch.Tensor): Prediction.
-        """
-        return self.model(inputs[0], inputs[1])
-
-    def training_step(self, batch: List[torch.LongTensor], batch_idx: int) -> torch.Tensor:
-        """
-        Training step.
-
-        Args:
-            batch (List[torch.LongTensor]): Training batch.
-            batch_idx (int): Batch index.
-
-        Returns (torch.Tensor): Loss tensor.
-        """
-        inputs, targets = batch[:-1], batch[-1]
-        outputs = self.forward(inputs)
-        loss = self.loss(outputs, targets)
-        self.log("train_loss", loss, on_epoch=True, on_step=True)
-        accuracy = self.accuracy_fn(outputs, targets)
-        self.log('train_accuracy', accuracy, on_epoch=True, on_step=True)
-
-        return loss
-
-    def validation_step(self, batch: List[torch.LongTensor], batch_idx: int):
-        """
-        Validation step.
-
-        Args:
-            batch (List[torch.LongTensor]): Validation batch.
-            batch_idx (int): Batch index.
-
-        Returns (torch.Tensor): Loss tensor.
-        """
-        inputs, targets = batch[:-1], batch[-1]
-        outputs = self.forward(inputs)
-        loss = self.loss(outputs, targets)
-        self.log("validation_loss", loss, on_epoch=True, on_step=True)
-
-        accuracy = self.accuracy_fn(outputs, targets)
-        self.log("validation_accuracy", accuracy, on_epoch=True, on_step=True)
-        return loss
-
-    def test_step(self, batch: List[torch.LongTensor], batch_idx: int):
-        """
-        Test step.
-
-        Args:
-            batch (List[torch.LongTensor]): Test batch.
-            batch_idx (int): Batch index.
-
-        Returns (torch.Tensor): Loss tensor.
-        """
-        inputs, targets = batch[:-1], batch[-1]
-        outputs = self.forward(inputs)
-        loss = self.loss(outputs, targets)
-        self.log("test_loss", loss, on_epoch=True, on_step=True)
-
-        return loss
-
-    def configure_optimizers(self):
-        """
-        Configure optimizer for Pytorch lighting.
-
-        Returns: Optimizer and scheduler for pytorch lighting.
-        """
-        optimizer = self.optimizer(self.parameters(), **self.optimizer_params)
-        scheduler = self.scheduler(optimizer, **self.scheduler_params)
-        scheduler = {
-            "scheduler": scheduler,
-            "monitor": "validation_loss",
-            "interval": self.scheduler_interval,
-        }
-
-        return [optimizer], [scheduler]
