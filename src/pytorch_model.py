@@ -326,6 +326,10 @@ class FastTextModule(pl.LightningModule):
         self,
         model: FastTextModel,
         loss,
+        self.accuracy_fn = Accuracy(
+            task="multiclass",
+            num_classes=self.model.num_classes
+        )
         optimizer,
         optimizer_params,
         scheduler,
@@ -379,7 +383,9 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("train_loss", loss, on_epoch=True)
+        self.log("train_loss", loss, on_epoch=True, on_step=True)
+        accuracy = self.accuracy_fn(outputs, targets)
+        self.log('train_accuracy', accuracy, on_epoch=True, on_step=True)
 
         return loss
 
@@ -396,10 +402,10 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("validation_loss", loss, on_epoch=True)
+        self.log("validation_loss", loss, on_epoch=True, on_step=True)
 
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log("validation_accuracy", accuracy, on_epoch=True)
+        self.log("validation_accuracy", accuracy, on_epoch=True, on_step=True)
         return loss
 
     def test_step(self, batch: List[torch.LongTensor], batch_idx: int):
@@ -415,7 +421,7 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("test_loss", loss, on_epoch=True)
+        self.log("test_loss", loss, on_epoch=True, on_step=True)
 
         return loss
 
