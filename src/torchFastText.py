@@ -52,9 +52,10 @@ class torchFastText:
             self.len_word_ngrams,
             training_text,
         )
+ 
 
     def build(self, training_text, categorical_variables):
-        self.__build_tokenizer(training_text)
+        self.build_tokenizer(training_text)
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
             embedding_dim=self.embedding_dim,

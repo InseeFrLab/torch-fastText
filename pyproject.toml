@@ -1,2 +1,34 @@
 [tool.ruff]
 line-length = 100
+
+[project]
+name = "torch-fasttext"
+version = "0.0.1"
+dependencies = [
+    'pytorch_lightning',
+    'captum',
+    'unidecode'
+]
+description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/InseeFrLab/torch-fasttext"
+Issues = "https://github.com/InseeFrLab/torch-fasttext/issues"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+#[tool.setuptools.packages.find]
+# All the following settings are optional:
+#where = ["src"]  # ["."] by default
+#include = ["*"]  # ["*"] by default
+#exclude = []  # empty by default
+#namespaces = true  # true by default

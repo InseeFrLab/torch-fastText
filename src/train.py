@@ -15,7 +15,7 @@ import pyarrow.parquet as pq
 import pytorch_lightning as pl
 import s3fs
 import torch
-from models.model import FastTextModel, FastTextModule
+from pytorch_model  import FastTextModel, FastTextModule
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
@@ -26,10 +26,10 @@ from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.optim import SGD, Adam
 
-from config.dataset import FastTextModelDataset
+from dataset import FastTextModelDataset
 from config.preprocess import clean_and_tokenize_df, clean_text_feature
-from losses.ova import OneVsAllLoss
-from tokenizer.tokenizer import NGramTokenizer
+from losses import OneVsAllLoss
+from tokenizer import NGramTokenizer
 
 
 def train(
