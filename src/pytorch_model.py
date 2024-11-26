@@ -153,6 +153,7 @@ class FastTextModel(nn.Module):
             text (list[str]): A plist containing the preprocessed text (one line for each sentence).
         """
 
+        flag_change_embed = False
         if explain:
             if self.direct_bagging:
                 # Get back the classical embedding layer for explainability
@@ -169,6 +170,7 @@ class FastTextModel(nn.Module):
                 self.direct_bagging = (
                     False  # To inform the forward pass that we are not using EmbeddingBag anymore
                 )
+                flag_change_embed = True
 
             lig = LayerIntegratedGradients(
                 self, self.embeddings
@@ -243,6 +245,22 @@ class FastTextModel(nn.Module):
         predictions = np.empty((batch_size, top_k)).astype("str")
 
         if explain:
+            assert not self.direct_bagging, "Direct bagging should be False for explainability"
+            # Get back to initial embedding layer:
+            # EmbeddingBag -> Embedding -> EmbeddingBag
+            # or keep Embedding with no change
+            if flag_change_embed:
+                new_embed_layer = nn.EmbeddingBag(
+                    embedding_dim=self.embedding_dim,
+                    num_embeddings=self.vocab_size,
+                    padding_idx=self.padding_idx,
+                    sparse=self.sparse,
+                )
+                new_embed_layer.load_state_dict(
+                    self.embeddings.state_dict()
+                )  # No issues, as exactly the same parameters
+                self.embeddings = new_embed_layer
+                self.direct_bagging = True
             return (
                 predictions,
                 confidence,

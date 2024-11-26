@@ -19,3 +19,4 @@ captum
 ipywidgets
 seaborn
 ruff>=0.7.1
+pre-commit

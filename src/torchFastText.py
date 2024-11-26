@@ -42,6 +42,8 @@ class torchFastText:
         self.tokenizer = None
         self.pytorch_model = None
         self.sparse = sparse
+        self.trained = False
+        self.num_categorical_features = None
 
     def build_tokenizer(self, training_text):
         self.tokenizer = NGramTokenizer(
@@ -52,9 +54,9 @@ class torchFastText:
             self.len_word_ngrams,
             training_text,
         )
- 
 
     def build(self, training_text, categorical_variables):
+        self.num_categorical_features = categorical_variables.shape[1]
         self.build_tokenizer(training_text)
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
@@ -64,6 +66,7 @@ class torchFastText:
             categorical_vocabulary_sizes=np.max(categorical_variables, axis=0) + 1,
             padding_idx=self.num_buckets + self.tokenizer.get_nwords(),
             sparse=self.sparse,
+            direct_bagging=True,
         )
 
     def train(
@@ -246,6 +249,8 @@ class torchFastText:
         self.pytorch_model = FastTextModule.load_from_checkpoint(self.best_model_path).model.to(
             "cpu"
         )
+        self.trained = True
+        self.pytorch_model.eval()
 
     def load_from_checkpoint(self, path):
         module = FastTextModule.load_from_checkpoint(path)
@@ -262,10 +267,33 @@ class torchFastText:
         self.len_word_ngrams = self.tokenizer.word_ngrams
         self.no_cat_var = self.pytorch_model.no_cat_var
 
-    def predict(self, X_test, batch_size=32, num_workers=12):
-        # TODO
-        pass
+    def predict(self, X, top_k=1):
+        if not self.trained:
+            raise Exception("Model must be trained first.")
+
+        # checking right format for inputs
+        text, categorical_variables, no_cat_var = check_X(X)
+        if categorical_variables.shape[1] != self.num_categorical_features:
+            raise Exception(
+                f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
+            )
+
+        self.pytorch_model.to(X.device)
+
+        return self.pytorch_model.predict(text, categorical_variables, top_k=top_k)
 
     def predict_and_explain(self, X):
-        # TODO
-        pass
+        if not self.trained:
+            raise Exception("Model must be trained first.")
+
+        # checking right format for inputs
+        text, categorical_variables, no_cat_var = check_X(X)
+
+        if categorical_variables.shape[1] != self.num_categorical_features:
+            raise Exception(
+                f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
+            )
+
+        self.pytorch_model.to(X.device)
+
+        return self.pytorch_model.predict_and_explain(text, categorical_variables)
