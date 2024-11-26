@@ -11,7 +11,7 @@ from captum.attr import LayerIntegratedGradients
 from torch import nn
 
 from config.preprocess import clean_text_feature
-from explainability.utils import (
+from utils import (
     compute_preprocessed_word_score,
     compute_word_score,
     explain_continuous,
@@ -180,19 +180,11 @@ class FastTextModel(nn.Module):
         batch_size = len(text)
         params["text"] = text
 
-        text = clean_text_feature(text)  # preprocess text
+        text = clean_text_feature(text)
 
-        indices_batch = []
-        id_to_token_dicts = []
-        token_to_id_dicts = []
-
-        for sentence in text:
-            all_ind, id_to_token, token_to_id = self.tokenizer.indices_matrix(
-                sentence
-            )  # tokenize and convert to token indices
-            indices_batch.append(all_ind)
-            id_to_token_dicts.append(id_to_token)
-            token_to_id_dicts.append(token_to_id)
+        indices_batch, id_to_token_dicts, token_to_id_dicts = self.tokenizer.tokenize(
+            text, text_tokens=False
+        )
 
         max_tokens = max([len(indices) for indices in indices_batch])
 
@@ -269,10 +261,9 @@ class FastTextModel(nn.Module):
                 id_to_token_dicts,
                 token_to_id_dicts,
                 text,
-                label_scores,
             )
         else:
-            return predictions, confidence, label_scores
+            return predictions, confidence
 
     def predict_and_explain(self, text, params, top_k=1, n=5, cutoff=0.65):
         """
@@ -299,7 +290,6 @@ class FastTextModel(nn.Module):
             id_to_token_dicts,
             token_to_id_dicts,
             processed_text,
-            _,
         ) = self.predict(text=text, params=params, top_k=top_k, explain=True)
 
         assert not self.direct_bagging, "Direct bagging should be False for explainability"

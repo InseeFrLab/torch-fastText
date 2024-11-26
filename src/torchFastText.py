@@ -258,7 +258,7 @@ class torchFastText:
         self.tokenizer = self.pytorch_model.tokenizer
 
         self.sparse = self.pytorch_model.sparse
-        self.num_buckets = self.tokenizer.buckets
+        self.num_buckets = self.tokenizer.num_buckets
         self.embedding_dim = self.pytorch_model.embedding_dim
         self.num_classes = self.pytorch_model.num_classes
         self.min_count = self.tokenizer.min_count
@@ -268,6 +268,17 @@ class torchFastText:
         self.no_cat_var = self.pytorch_model.no_cat_var
 
     def predict(self, X, top_k=1):
+        """
+        Predicts the "top_k" classes of the input text.
+
+        Args:
+            X (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
+            top_k (int): Number of classes to predict (by order of confidence).
+
+        Returns:
+            np.ndarray: Array of shape (N,top_k)
+        """
+
         if not self.trained:
             raise Exception("Model must be trained first.")
 
@@ -282,7 +293,7 @@ class torchFastText:
 
         return self.pytorch_model.predict(text, categorical_variables, top_k=top_k)
 
-    def predict_and_explain(self, X):
+    def predict_and_explain(self, X, top_k=1):
         if not self.trained:
             raise Exception("Model must be trained first.")
 
@@ -296,4 +307,4 @@ class torchFastText:
 
         self.pytorch_model.to(X.device)
 
-        return self.pytorch_model.predict_and_explain(text, categorical_variables)
+        return self.pytorch_model.predict_and_explain(text, categorical_variables, top_k=top_k)

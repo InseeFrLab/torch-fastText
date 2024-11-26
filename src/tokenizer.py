@@ -7,43 +7,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-
-def get_hash(subword: str) -> int:
-    """
-    Return hash for a given subword.
-
-    Args:
-        subword (str): Character n-gram.
-
-    Returns:
-        int: Corresponding hash.
-    """
-    h = ctypes.c_uint32(2166136261).value
-    for c in subword:
-        c = ctypes.c_int8(ord(c)).value
-        h = ctypes.c_uint32(h ^ c).value
-        h = ctypes.c_uint32(h * 16777619).value
-    return h
-
-
-def get_word_ngram_id(hashes: Tuple[int], bucket: int, nwords: int) -> int:
-    """
-    Get word ngram hash.
-
-    Args:
-        hashes (Tuple[int]): Word hashes.
-        bucket (int): Number of rows in embedding matrix.
-        nwords (int): Number of words in the vocabulary.
-
-    Returns:
-        int: Word ngram hash.
-    """
-    hashes = [ctypes.c_int32(hash_value).value for hash_value in hashes]
-    h = ctypes.c_uint64(hashes[0]).value
-    for j in range(1, len(hashes)):
-        h = ctypes.c_uint64((h * 116049371)).value
-        h = ctypes.c_uint64(h + hashes[j]).value
-    return h % bucket + nwords
+from utils import tokenized_text_in_tokens
 
 
 class NGramTokenizer:
@@ -82,7 +46,7 @@ class NGramTokenizer:
             raise ValueError("`max_n` parameter must be smaller than 7.")
         self.min_n = min_n
         self.max_n = max_n
-        self.buckets = buckets
+        self.num_buckets = buckets
         self.word_ngrams = word_ngrams
 
         word_counts = {}
@@ -97,6 +61,15 @@ class NGramTokenizer:
                 self.word_id_mapping[word] = i
                 i += 1
         self.nwords = len(self.word_id_mapping)
+
+    def __str__(self) -> str:
+        """
+        Returns description of the NGramTokenizer.
+
+        Returns:
+            str: Description.
+        """
+        return f"<NGramTokenizer(min_n={self.min_n}, max_n={self.max_n}, num_buckets={self.num_buckets}, word_ngrams={self.word_ngrams}, nwords={self.nwords})>"
 
     def get_nwords(self) -> int:
         """
@@ -131,6 +104,44 @@ class NGramTokenizer:
         """
         return [word[i : i + n] for i in range(len(word) - n + 1)]
 
+    @staticmethod
+    def get_hash(subword: str) -> int:
+        """
+        Return hash for a given subword.
+
+        Args:
+            subword (str): Character n-gram.
+
+        Returns:
+            int: Corresponding hash.
+        """
+        h = ctypes.c_uint32(2166136261).value
+        for c in subword:
+            c = ctypes.c_int8(ord(c)).value
+            h = ctypes.c_uint32(h ^ c).value
+            h = ctypes.c_uint32(h * 16777619).value
+        return h
+
+    @staticmethod
+    def get_word_ngram_id(hashes: Tuple[int], bucket: int, nwords: int) -> int:
+        """
+        Get word ngram hash.
+
+        Args:
+            hashes (Tuple[int]): Word hashes.
+            bucket (int): Number of rows in embedding matrix.
+            nwords (int): Number of words in the vocabulary.
+
+        Returns:
+            int: Word ngram hash.
+        """
+        hashes = [ctypes.c_int32(hash_value).value for hash_value in hashes]
+        h = ctypes.c_uint64(hashes[0]).value
+        for j in range(1, len(hashes)):
+            h = ctypes.c_uint64((h * 116049371)).value
+            h = ctypes.c_uint64(h + hashes[j]).value
+        return h % bucket + nwords
+
     def get_subword_index(self, subword: str) -> int:
         """
         Return the row index from the embedding matrix which
@@ -142,7 +153,7 @@ class NGramTokenizer:
         Returns:
             int: Index.
         """
-        return get_hash(subword) % self.buckets + self.nwords
+        return self.get_hash(subword) % self.buckets + self.nwords
 
     def get_word_index(self, word: str) -> int:
         """
@@ -217,8 +228,8 @@ class NGramTokenizer:
                 gram = words[i : i + word_ngram_len]
                 gram = " ".join(gram)
 
-                hashes = tuple(get_hash(word) for word in gram)
-                word_ngram_id = int(get_word_ngram_id(hashes, self.buckets, self.nwords))
+                hashes = tuple(self.get_hash(word) for word in gram)
+                word_ngram_id = int(self.get_word_ngram_id(hashes, self.buckets, self.nwords))
                 all_tokens_id[gram] = word_ngram_id
                 word_ngram_ids.append(word_ngram_id)
 
@@ -227,3 +238,30 @@ class NGramTokenizer:
         id_to_token = {v: k for k, v in all_tokens_id.items()}
 
         return np.asarray(all_indices), id_to_token, all_tokens_id
+
+    def tokenize(self, text: list[str], text_tokens=True):
+        """
+        Tokenize a list of sentences.
+
+        Args:
+            sentence (list[str]): List of sentences.
+
+        Returns:
+            np.array: Array of indices.
+        """
+        tokenized_text = []
+        id_to_token_dicts = []
+        token_to_id_dicts = []
+        for sentence in text:
+            all_ind, id_to_token, token_to_id = self.indices_matrix(
+                sentence
+            )  # tokenize and convert to token indices
+            tokenized_text.append(all_ind)
+            id_to_token_dicts.append(id_to_token)
+            token_to_id_dicts.append(token_to_id)
+
+        if text_tokens:
+            tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
+            return tokenized_text_tokens, tokenized_text, id_to_token_dicts, token_to_id_dicts
+        else:
+            return tokenized_text, id_to_token_dicts, token_to_id_dicts
