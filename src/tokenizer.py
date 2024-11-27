@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 import numpy as np
 
+from config.preprocess import clean_text_feature
 from utils import tokenized_text_in_tokens
 
 
@@ -87,7 +88,7 @@ class NGramTokenizer:
         Returns:
             int: Number of buckets.
         """
-        return self.buckets
+        return self.num_buckets
 
     @staticmethod
     def get_ngram_list(word: str, n: int) -> List[str]:
@@ -153,7 +154,7 @@ class NGramTokenizer:
         Returns:
             int: Index.
         """
-        return self.get_hash(subword) % self.buckets + self.nwords
+        return self.get_hash(subword) % self.num_buckets + self.nwords
 
     def get_word_index(self, word: str) -> int:
         """
@@ -229,7 +230,7 @@ class NGramTokenizer:
                 gram = " ".join(gram)
 
                 hashes = tuple(self.get_hash(word) for word in gram)
-                word_ngram_id = int(self.get_word_ngram_id(hashes, self.buckets, self.nwords))
+                word_ngram_id = int(self.get_word_ngram_id(hashes, self.num_buckets, self.nwords))
                 all_tokens_id[gram] = word_ngram_id
                 word_ngram_ids.append(word_ngram_id)
 
@@ -249,6 +250,7 @@ class NGramTokenizer:
         Returns:
             np.array: Array of indices.
         """
+        text = clean_text_feature(text)
         tokenized_text = []
         id_to_token_dicts = []
         token_to_id_dicts = []

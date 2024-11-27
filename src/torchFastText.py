@@ -9,6 +9,7 @@ from pytorch_lightning.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
+from pytorch_lightning.utilities import rank_zero_only
 from torch.optim import SGD, Adam
 
 from checkers import check_X, check_Y
@@ -19,13 +20,27 @@ from tokenizer import NGramTokenizer
 
 logger = logging.getLogger(__name__)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler()],
+)
+
+
+@rank_zero_only
+def print_progress(*args, **kwargs):
+    print(*args, **kwargs)
+
+
+pl.utilities.seed.seed_everything(42)  # Optional
+
 
 class torchFastText:
     def __init__(
         self,
         num_buckets,
         embedding_dim,
-        num_classes,
         min_count,
         min_n,
         max_n,
@@ -34,7 +49,6 @@ class torchFastText:
     ):
         self.num_buckets = num_buckets
         self.embedding_dim = embedding_dim
-        self.num_classes = num_classes
         self.min_count = min_count
         self.min_n = min_n
         self.max_n = max_n
@@ -44,6 +58,7 @@ class torchFastText:
         self.sparse = sparse
         self.trained = False
         self.num_categorical_features = None
+        self.num_classes = None
 
     def build_tokenizer(self, training_text):
         self.tokenizer = NGramTokenizer(
@@ -55,7 +70,10 @@ class torchFastText:
             training_text,
         )
 
-    def build(self, training_text, categorical_variables):
+    def build(self, X_train, y_train):
+        training_text, categorical_variables, no_cat_var = check_X(X_train)
+        y_train = check_Y(y_train)
+        self.num_classes = len(np.unique(y_train))
         self.num_categorical_features = categorical_variables.shape[1]
         self.build_tokenizer(training_text)
         self.pytorch_model = FastTextModel(
@@ -91,14 +109,17 @@ class torchFastText:
         ##### Formatting exception handling #####
 
         assert isinstance(loss, torch.nn.Module), "loss must be a PyTorch loss function."
-        assert (
-            optimizer.__module__.startswith("torch.optim") or optimizer is None
+        assert optimizer is None or optimizer.__module__.startswith(
+            "torch.optim"
         ), "optimizer must be a PyTorch optimizer."
         assert (
             scheduler.__module__ == "torch.optim.lr_scheduler"
         ), "scheduler must be a PyTorch scheduler."
 
         # checking right format for inputs
+        if verbose:
+            logger.info("Checking inputs...")
+
         training_text, train_categorical_variables, train_no_cat_var = check_X(X_train)
         val_text, val_categorical_variables, val_no_cat_var = check_X(X_val)
         y_train = check_Y(y_train)
@@ -118,9 +139,8 @@ class torchFastText:
 
         self.no_cat_var = train_no_cat_var
 
-        all_categorical_variables = np.vstack(
-            [train_categorical_variables, val_categorical_variables]
-        )
+        if verbose:
+            logger.info("Inputs successfully checked. Starting the training process..")
 
         ######## Starting the training process ########
 
@@ -138,9 +158,7 @@ class torchFastText:
             if verbose:
                 start = time.time()
                 logger.info("Building the model...")
-            self.build(
-                training_text, all_categorical_variables
-            )  # We use all categorical variables not to miss any labels
+            self.build(X_train, y_train)  # We use all categorical variables not to miss any labels
             if verbose:
                 end = time.time()
                 logger.info("Model successfully built in {:.2f} seconds.".format(end - start))
@@ -223,7 +241,6 @@ class torchFastText:
 
         # Strategy
         strategy = "auto"
-
         # Trainer
         self.trainer = pl.Trainer(
             callbacks=callbacks,
@@ -231,6 +248,7 @@ class torchFastText:
             num_sanity_val_steps=2,
             strategy=strategy,
             log_every_n_steps=2,
+            enable_progress_bar=True,
         )
 
         torch.cuda.empty_cache()
@@ -266,6 +284,42 @@ class torchFastText:
         self.max_n = self.tokenizer.max_n
         self.len_word_ngrams = self.tokenizer.word_ngrams
         self.no_cat_var = self.pytorch_model.no_cat_var
+
+    def validate(self, X, Y, batch_size=256, num_workers=12):
+        """
+        Validates the model on the given data.
+
+        Args:
+            X (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
+            Y (np.ndarray): Array of shape (N,) with the labels.
+
+        Returns:
+            float: The validation loss.
+        """
+
+        if not self.trained:
+            raise Exception("Model must be trained first.")
+
+        # checking right format for inputs
+        text, categorical_variables, no_cat_var = check_X(X)
+        y = check_Y(Y)
+
+        if categorical_variables.shape[1] != self.num_categorical_features:
+            raise Exception(
+                f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
+            )
+
+        self.pytorch_model.to(X.device)
+
+        dataset = FastTextModelDataset(
+            categorical_variables=categorical_variables,
+            texts=text,
+            outputs=y,
+            tokenizer=self.tokenizer,
+        )
+        dataloader = dataset.create_dataloader(batch_size=batch_size, num_workers=num_workers)
+
+        return self.trainer.test(self.pytorch_model, test_dataloaders=dataloader, verbose=False)
 
     def predict(self, X, top_k=1):
         """
@@ -308,3 +362,11 @@ class torchFastText:
         self.pytorch_model.to(X.device)
 
         return self.pytorch_model.predict_and_explain(text, categorical_variables, top_k=top_k)
+
+    def quantize():
+        # TODO
+        pass
+
+    def dequantize():
+        # TODO
+        pass

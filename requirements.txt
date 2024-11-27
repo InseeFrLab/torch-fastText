@@ -11,7 +11,7 @@ torch
 pytorch_lightning
 pandas
 scikit-learn
-pyarrow==16.1.0
+pyarrow
 mlflow
 unidecode
 fasttext

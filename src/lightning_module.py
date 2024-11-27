@@ -33,7 +33,7 @@ class FastTextModule(pl.LightningModule):
             scheduler_interval: Scheduler interval.
         """
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model", "loss"])
 
         self.model = model
         self.loss = loss
@@ -107,6 +107,9 @@ class FastTextModule(pl.LightningModule):
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
         self.log("test_loss", loss, on_epoch=True, on_step=True)
+
+        accuracy = self.accuracy_fn(outputs, targets)
+        self.log("validation_accuracy", accuracy, on_epoch=True, on_step=True)
 
         return loss
 

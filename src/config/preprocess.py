@@ -4,6 +4,7 @@ Processing fns.
 
 import string
 
+import nltk
 import numpy as np
 import pandas as pd
 import unidecode
@@ -24,6 +25,7 @@ def clean_text_feature(text: list[str], remove_stop_words=True) -> pd.DataFrame:
         df (pd.DataFrame): DataFrame.
     """
     # Define stopwords and stemmer
+    nltk.download("stopwords")
     stopwords = tuple(ntlk_stopwords.words("french")) + tuple(string.ascii_lowercase)
     stemmer = SnowballStemmer(language="french")
 
@@ -34,7 +36,6 @@ def clean_text_feature(text: list[str], remove_stop_words=True) -> pd.DataFrame:
     text = np.char.lower(text)
 
     # Remove one letter words
-
     def mylambda(x):
         return " ".join([w for w in x.split() if len(w) > 1])
 
@@ -108,7 +109,12 @@ def categorize_surface(
     return df_copy
 
 
-def clean_and_tokenize_df(df, categorical_features=["EVT", "CJ", "NAT", "TYP", "CRT"]):
+def clean_and_tokenize_df(
+    df,
+    categorical_features=["EVT", "CJ", "NAT", "TYP", "CRT"],
+    text_feature="libelle_processed",
+    label_col="apet_finale",
+):
     df.fillna("nan", inplace=True)
 
     df = df.rename(
@@ -129,5 +135,6 @@ def clean_and_tokenize_df(df, categorical_features=["EVT", "CJ", "NAT", "TYP", "
         les.append(le)
 
     df = categorize_surface(df, "SRF", like_sirene_3=True)
+    df = df[[text_feature, "EVT", "CJ", "NAT", "TYP", "SRF", "CRT", label_col]]
 
     return df, les

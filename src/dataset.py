@@ -4,6 +4,7 @@ Dataset class for a FastTextModel without the fastText dependency.
 
 from typing import List
 
+import numpy as np
 import torch
 
 from tokenizer import NGramTokenizer
@@ -64,10 +65,10 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             List[int, str]: Observation with given index.
         """
-        categorical_variables = [variable[index] for variable in self.categorical_variables]
+        categorical_variables = self.categorical_variables[index]
         text = self.texts[index]
         y = self.outputs[index]
-        return [text, *categorical_variables, y]
+        return text, categorical_variables, y
 
     def collate_fn(self, batch):
         """
@@ -81,9 +82,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         """
         # Get inputs
         text = [item[0] for item in batch]
-        categorical_variables = [
-            [item[1 + i] for item in batch] for i in range(len(self.categorical_variables))
-        ]
+        categorical_variables = [item[1] for item in batch]
         y = [item[-1] for item in batch]
 
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
@@ -95,10 +94,9 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             padding_value=padding_index,
         )
 
-        categorical_tensors = [torch.LongTensor(variable) for variable in categorical_variables]
-        categorical_tensors = torch.vstack(
-            categorical_tensors
-        ).T  # (batch_size, num_categorical_features)
+        categorical_tensors = torch.Tensor(
+            np.vstack(categorical_variables)
+        )  # (batch_size, num_categorical_features)
 
         y = torch.LongTensor(y)
 
