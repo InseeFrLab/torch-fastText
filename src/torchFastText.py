@@ -13,10 +13,10 @@ from pytorch_lightning.utilities import rank_zero_only
 from torch.optim import SGD, Adam
 
 from checkers import check_X, check_Y
-from dataset import FastTextModelDataset
-from lightning_module import FastTextModule
-from pytorch_model import FastTextModel
-from tokenizer import NGramTokenizer
+from datasets.dataset import FastTextModelDataset
+from model.lightning_module import FastTextModule
+from model.pytorch_model import FastTextModel
+from datasets.tokenizer import NGramTokenizer
 
 logger = logging.getLogger(__name__)
 
