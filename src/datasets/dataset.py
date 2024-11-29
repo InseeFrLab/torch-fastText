@@ -64,7 +64,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             List[int, str]: Observation with given index.
         """
-        categorical_variables = self.categorical_variables[index]
+        categorical_variables = self.categorical_variables[index] if self.categorical_variables is not None else None
         text = self.texts[index]
         y = self.outputs[index]
         return text, categorical_variables, y
@@ -83,22 +83,17 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         text = [item[0] for item in batch]
         categorical_variables = [item[1] for item in batch]
         y = [item[-1] for item in batch]
-
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
-
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
         padded_batch = torch.nn.utils.rnn.pad_sequence(
             [torch.LongTensor(indices) for indices in indices_batch],
             batch_first=True,
             padding_value=padding_index,
         )
-
         categorical_tensors = torch.Tensor(
-            np.vstack(categorical_variables)
+                np.vstack(categorical_variables)
         )  # (batch_size, num_categorical_features)
-
         y = torch.LongTensor(y)
-
         return (padded_batch, categorical_tensors, y)
 
     def create_dataloader(
