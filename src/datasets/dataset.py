@@ -6,8 +6,7 @@ from typing import List
 
 import numpy as np
 import torch
-
-from tokenizer import NGramTokenizer
+from datasets.tokenizer import NGramTokenizer
 
 
 class FastTextModelDataset(torch.utils.data.Dataset):
