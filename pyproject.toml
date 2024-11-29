@@ -7,7 +7,9 @@ version = "0.0.1"
 dependencies = [
     'pytorch_lightning',
     'captum',
-    'unidecode'
+    'unidecode',
+    'nltk',
+    'scikit-learn'
 ]
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
 readme = "README.md"
