@@ -8,9 +8,8 @@ from typing import List
 import numpy as np
 import torch
 from captum.attr import LayerIntegratedGradients
-from torch import nn
-
 from preprocess import clean_text_feature
+from torch import nn
 from utils import (
     compute_preprocessed_word_score,
     compute_word_score,

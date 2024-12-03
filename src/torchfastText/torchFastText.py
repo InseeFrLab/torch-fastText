@@ -4,6 +4,11 @@ import time
 import numpy as np
 import pytorch_lightning as pl
 import torch
+from checkers import check_X, check_Y
+from datasets.dataset import FastTextModelDataset
+from datasets.tokenizer import NGramTokenizer
+from model.lightning_module import FastTextModule
+from model.pytorch_model import FastTextModel
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
@@ -11,12 +16,6 @@ from pytorch_lightning.callbacks import (
 )
 from pytorch_lightning.utilities import rank_zero_only
 from torch.optim import SGD, Adam
-
-from checkers import check_X, check_Y
-from datasets.dataset import FastTextModelDataset
-from datasets.tokenizer import NGramTokenizer
-from model.lightning_module import FastTextModule
-from model.pytorch_model import FastTextModel
 
 logger = logging.getLogger(__name__)
 

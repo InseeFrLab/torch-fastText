@@ -14,7 +14,7 @@ def check_X(X):
         if X.ndim > 1:
             text = X[:, 0].astype(str)
         else:
-            text=X[:].astype(str)
+            text = X[:].astype(str)
     except ValueError:
         logger.error("The first column of X must be castable in string format.")
 

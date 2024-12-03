@@ -64,7 +64,9 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             List[int, str]: Observation with given index.
         """
-        categorical_variables = self.categorical_variables[index] if self.categorical_variables is not None else None
+        categorical_variables = (
+            self.categorical_variables[index] if self.categorical_variables is not None else None
+        )
         text = self.texts[index]
         y = self.outputs[index]
         return text, categorical_variables, y
@@ -91,7 +93,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             padding_value=padding_index,
         )
         categorical_tensors = torch.Tensor(
-                np.vstack(categorical_variables)
+            np.vstack(categorical_variables)
         )  # (batch_size, num_categorical_features)
         y = torch.LongTensor(y)
         return (padded_batch, categorical_tensors, y)
