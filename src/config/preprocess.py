@@ -25,7 +25,7 @@ def clean_text_feature(text: list[str], remove_stop_words=True) -> pd.DataFrame:
         df (pd.DataFrame): DataFrame.
     """
     # Define stopwords and stemmer
-    nltk.download("stopwords")
+    nltk.download("stopwords", quiet=True)
     stopwords = tuple(ntlk_stopwords.words("french")) + tuple(string.ascii_lowercase)
     stemmer = SnowballStemmer(language="french")
 

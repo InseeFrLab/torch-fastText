@@ -14,9 +14,9 @@ from torch.optim import SGD, Adam
 
 from checkers import check_X, check_Y
 from datasets.dataset import FastTextModelDataset
+from datasets.tokenizer import NGramTokenizer
 from model.lightning_module import FastTextModule
 from model.pytorch_model import FastTextModel
-from datasets.tokenizer import NGramTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ logging.basicConfig(
 @rank_zero_only
 def print_progress(*args, **kwargs):
     print(*args, **kwargs)
+
 
 class torchFastText:
     def __init__(
@@ -66,15 +67,30 @@ class torchFastText:
             training_text,
         )
 
-    def build(self, X_train, y_train):
+    def build(
+        self,
+        X_train,
+        y_train,
+        lightning=True,
+        optimizer=None,
+        optimizer_params=None,
+        lr=None,
+        scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau,
+        patience_scheduler=3,
+        loss=torch.nn.CrossEntropyLoss(),
+    ):
         training_text, categorical_variables, no_cat_var = check_X(X_train)
         y_train = check_Y(y_train)
-        self.num_classes = len(np.unique(y_train))
-        if(not no_cat_var):
+        self.num_classes = len(
+            np.unique(y_train)
+        )  # Be sure that y_train contains all the classes !
+
+        if not no_cat_var:
             self.num_categorical_features = categorical_variables.shape[1]
             categorical_vocabulary_sizes = np.max(categorical_variables, axis=0) + 1
         else:
-            categorical_vocabulary_sizes=None
+            categorical_vocabulary_sizes = None
+
         self.build_tokenizer(training_text)
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
@@ -86,6 +102,38 @@ class torchFastText:
             sparse=self.sparse,
             direct_bagging=True,
         )
+
+        if lightning:
+            # Optimizer, scheduler and loss
+            if optimizer is None:
+                assert lr is not None, "Please provide a learning rate."
+                if not self.sparse:
+                    self.optimizer = Adam
+                else:
+                    self.optimizer = SGD
+                optimizer_params = {"lr": lr}
+            else:
+                self.optimizer = optimizer
+                if optimizer_params is None:
+                    logger.warning("No optimizer parameters provided. Using default parameters.")
+
+            self.scheduler = scheduler
+            scheduler_params = {
+                "mode": "min",
+                "patience": patience_scheduler,
+            }
+            self.loss = loss
+
+            # Lightning Module
+            self.module = FastTextModule(
+                model=self.pytorch_model,
+                loss=self.loss,
+                optimizer=self.optimizer,
+                optimizer_params=optimizer_params,
+                scheduler=self.scheduler,
+                scheduler_params=scheduler_params,
+                scheduler_interval="epoch",
+            )
 
     def train(
         self,
@@ -134,8 +182,7 @@ class torchFastText:
             X_train.shape[0] == y_train.shape[0]
         ), "X_train and y_train must have the same first dimension (number of observations)."
         assert (
-            X_train.ndim > 1 and X_train.shape[1] == X_val.shape[1]
-            or X_val.ndim == 1
+            X_train.ndim > 1 and X_train.shape[1] == X_val.shape[1] or X_val.ndim == 1
         ), "X_train and X_val must have the same number of columns."
 
         self.no_cat_var = train_no_cat_var
@@ -159,7 +206,16 @@ class torchFastText:
             if verbose:
                 start = time.time()
                 logger.info("Building the model...")
-            self.build(X_train, y_train)  # We use all categorical variables not to miss any labels
+            self.build(
+                X_train,
+                y_train,
+                optimizer=optimizer,
+                optimizer_params=optimizer_params,
+                lr=lr,
+                scheduler=scheduler,
+                patience_scheduler=patience_scheduler,
+                loss=loss,
+            )
             if verbose:
                 end = time.time()
                 logger.info("Model successfully built in {:.2f} seconds.".format(end - start))
@@ -185,37 +241,6 @@ class torchFastText:
         )
         val_dataloader = val_dataset.create_dataloader(
             batch_size=batch_size, num_workers=num_workers
-        )
-
-        # Optimizer, scheduler and loss
-        if optimizer is None:
-            assert lr is not None, "Please provide a learning rate."
-            if not self.sparse:
-                self.optimizer = Adam
-            else:
-                self.optimizer = SGD
-            optimizer_params = {"lr": lr}
-        else:
-            self.optimizer = optimizer
-            if optimizer_params is None:
-                logger.warning("No optimizer parameters provided. Using default parameters.")
-
-        self.scheduler = scheduler
-        scheduler_params = {
-            "mode": "min",
-            "patience": patience_scheduler,
-        }
-        self.loss = loss
-
-        # Lightning Module
-        module = FastTextModule(
-            model=self.pytorch_model,
-            loss=self.loss,
-            optimizer=self.optimizer,
-            optimizer_params=optimizer_params,
-            scheduler=self.scheduler,
-            scheduler_params=scheduler_params,
-            scheduler_interval="epoch",
         )
 
         if verbose:
@@ -258,7 +283,7 @@ class torchFastText:
         if verbose:
             logger.info("Launching training...")
             start = time.time()
-        self.trainer.fit(module, train_dataloader, val_dataloader)
+        self.trainer.fit(self.module, train_dataloader, val_dataloader)
         if verbose:
             end = time.time()
             logger.info("Training done in {:.2f} seconds.".format(end - start))

@@ -267,3 +267,6 @@ class NGramTokenizer:
             return tokenized_text_tokens, tokenized_text, id_to_token_dicts, token_to_id_dicts
         else:
             return tokenized_text, id_to_token_dicts, token_to_id_dicts
+
+    def get_vocab(self):
+        return self.word_id_mapping
