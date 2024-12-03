@@ -2,7 +2,7 @@
 line-length = 100
 
 [project]
-name = "torchfastText"
+name = "torchFastText"
 version = "0.0.1"
 dependencies = [
     'pytorch_lightning',
