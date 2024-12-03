@@ -33,9 +33,6 @@ def print_progress(*args, **kwargs):
     print(*args, **kwargs)
 
 
-pl.utilities.seed.seed_everything(42)  # Optional
-
-
 class torchFastText:
     def __init__(
         self,
