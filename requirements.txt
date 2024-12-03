@@ -6,7 +6,6 @@ scikit-learn
 pyarrow
 mlflow
 nltk
-fasttext
 torch
 pytorch_lightning
 pandas
@@ -14,7 +13,6 @@ scikit-learn
 pyarrow
 mlflow
 unidecode
-fasttext
 captum
 ipywidgets
 seaborn

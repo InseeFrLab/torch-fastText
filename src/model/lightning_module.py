@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 from torchmetrics import Accuracy
 
-from pytorch_model import FastTextModel
+from model.pytorch_model import FastTextModel
 
 
 class FastTextModule(pl.LightningModule):

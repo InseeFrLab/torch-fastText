@@ -11,7 +11,10 @@ def check_X(X):
     ), "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
 
     try:
-        text = X[:, 0].astype(str)
+        if X.ndim > 1:
+            text = X[:, 0].astype(str)
+        else:
+            text=X[:].astype(str)
     except ValueError:
         logger.error("The first column of X must be castable in string format.")
 

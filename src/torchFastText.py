@@ -13,10 +13,10 @@ from pytorch_lightning.utilities import rank_zero_only
 from torch.optim import SGD, Adam
 
 from checkers import check_X, check_Y
-from dataset import FastTextModelDataset
-from lightning_module import FastTextModule
-from pytorch_model import FastTextModel
-from tokenizer import NGramTokenizer
+from datasets.dataset import FastTextModelDataset
+from model.lightning_module import FastTextModule
+from model.pytorch_model import FastTextModel
+from datasets.tokenizer import NGramTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,6 @@ logging.basicConfig(
 @rank_zero_only
 def print_progress(*args, **kwargs):
     print(*args, **kwargs)
-
 
 class torchFastText:
     def __init__(
@@ -71,14 +70,18 @@ class torchFastText:
         training_text, categorical_variables, no_cat_var = check_X(X_train)
         y_train = check_Y(y_train)
         self.num_classes = len(np.unique(y_train))
-        self.num_categorical_features = categorical_variables.shape[1]
+        if(not no_cat_var):
+            self.num_categorical_features = categorical_variables.shape[1]
+            categorical_vocabulary_sizes = np.max(categorical_variables, axis=0) + 1
+        else:
+            categorical_vocabulary_sizes=None
         self.build_tokenizer(training_text)
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
             embedding_dim=self.embedding_dim,
             vocab_size=self.num_buckets + self.tokenizer.get_nwords() + 1,
             num_classes=self.num_classes,
-            categorical_vocabulary_sizes=np.max(categorical_variables, axis=0) + 1,
+            categorical_vocabulary_sizes=categorical_vocabulary_sizes,
             padding_idx=self.num_buckets + self.tokenizer.get_nwords(),
             sparse=self.sparse,
             direct_bagging=True,
@@ -131,7 +134,8 @@ class torchFastText:
             X_train.shape[0] == y_train.shape[0]
         ), "X_train and y_train must have the same first dimension (number of observations)."
         assert (
-            X_train.shape[1] == X_val.shape[1]
+            X_train.ndim > 1 and X_train.shape[1] == X_val.shape[1]
+            or X_val.ndim == 1
         ), "X_train and X_val must have the same number of columns."
 
         self.no_cat_var = train_no_cat_var
