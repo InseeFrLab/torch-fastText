@@ -6,8 +6,9 @@ import ctypes
 from typing import List, Tuple
 
 import numpy as np
-from preprocess import clean_text_feature
-from utils import tokenized_text_in_tokens
+
+from ..preprocess import clean_text_feature
+from ..utilities.utils import tokenized_text_in_tokens
 
 
 class NGramTokenizer:

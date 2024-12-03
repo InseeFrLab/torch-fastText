@@ -7,8 +7,9 @@ from difflib import SequenceMatcher
 
 import numpy as np
 import torch
-from preprocess import clean_text_feature
 from scipy.special import softmax
+
+from ..preprocess import clean_text_feature
 
 
 def tokenized_text_in_tokens(
