@@ -111,27 +111,27 @@ class torchFastText:
                     self.optimizer = Adam
                 else:
                     self.optimizer = SGD
-                optimizer_params = {"lr": lr}
+                self.optimizer_params = {"lr": lr}
             else:
                 self.optimizer = optimizer
-                if optimizer_params is None:
+                if self.optimizer_params is None:
                     logger.warning("No optimizer parameters provided. Using default parameters.")
 
             self.scheduler = scheduler
-            scheduler_params = {
+            self.scheduler_params = {
                 "mode": "min",
                 "patience": patience_scheduler,
             }
             self.loss = loss
 
             # Lightning Module
-            self.module = FastTextModule(
+            self.lightning_module = FastTextModule(
                 model=self.pytorch_model,
                 loss=self.loss,
                 optimizer=self.optimizer,
-                optimizer_params=optimizer_params,
+                optimizer_params=self.optimizer_params,
                 scheduler=self.scheduler,
-                scheduler_params=scheduler_params,
+                scheduler_params=self.scheduler_params,
                 scheduler_interval="epoch",
             )
 
@@ -283,29 +283,45 @@ class torchFastText:
         if verbose:
             logger.info("Launching training...")
             start = time.time()
-        self.trainer.fit(self.module, train_dataloader, val_dataloader)
+        self.trainer.fit(self.lightning_module, train_dataloader, val_dataloader)
         if verbose:
             end = time.time()
             logger.info("Training done in {:.2f} seconds.".format(end - start))
 
         # Load best model
         self.best_model_path = self.trainer.checkpoint_callback.best_model_path
-        self.pytorch_model = FastTextModule.load_from_checkpoint(self.best_model_path).model.to(
-            "cpu"
+        self.lightning_module = FastTextModule.load_from_checkpoint(
+            self.best_model_path,
+            model=self.pytorch_model,
+            loss=self.loss,
+            optimizer=self.optimizer,
+            optimizer_params=self.optimizer_params,
+            scheduler=self.scheduler,
+            scheduler_params=self.scheduler_params,
+            scheduler_interval="epoch",
         )
+        self.pytorch_model = self.lightning_module.model.to("cpu")
         self.trained = True
         self.pytorch_model.eval()
 
     def load_from_checkpoint(self, path):
-        module = FastTextModule.load_from_checkpoint(path)
-        self.pytorch_model = module.model
+        self.lightning_module = FastTextModule.load_from_checkpoint(
+            self.best_model_path,
+            model=self.pytorch_model,
+            loss=self.loss,
+            optimizer=self.optimizer,
+            optimizer_params=self.optimizer_params,
+            scheduler=self.scheduler,
+            scheduler_params=self.scheduler_params,
+            scheduler_interval="epoch",
+        )
+        self.pytorch_model = self.lightning_module.model
         self.tokenizer = self.pytorch_model.tokenizer
 
         self.sparse = self.pytorch_model.sparse
         self.num_buckets = self.tokenizer.num_buckets
         self.embedding_dim = self.pytorch_model.embedding_dim
         self.num_classes = self.pytorch_model.num_classes
-        self.min_count = self.tokenizer.min_count
         self.min_n = self.tokenizer.min_n
         self.max_n = self.tokenizer.max_n
         self.len_word_ngrams = self.tokenizer.word_ngrams
