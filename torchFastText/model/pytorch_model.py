@@ -10,7 +10,6 @@ import torch
 from captum.attr import LayerIntegratedGradients
 from torch import nn
 
-from ..preprocess import clean_text_feature
 from ..utilities.utils import (
     compute_preprocessed_word_score,
     compute_word_score,
@@ -130,7 +129,9 @@ class FastTextModel(nn.Module):
         z = self.fc(x_in)  # (batch_size, num_classes)
         return z
 
-    def predict(self, text: List[str], params: dict[str, any] = None, top_k=1, explain=False):
+    def predict(
+        self, text: List[str], categorical_variables: List[List[int]], top_k=1, explain=False
+    ):
         """
         Args:
             text (List[str]): A list of text observations.
@@ -178,14 +179,10 @@ class FastTextModel(nn.Module):
 
         self.eval()
         batch_size = len(text)
-        params["text"] = text
-
-        text = clean_text_feature(text)
 
         indices_batch, id_to_token_dicts, token_to_id_dicts = self.tokenizer.tokenize(
             text, text_tokens=False
         )
-
         max_tokens = max([len(indices) for indices in indices_batch])
 
         padding_index = (
@@ -207,11 +204,10 @@ class FastTextModel(nn.Module):
         )  # (batch_size, seq_len) - Tokenized (int) + padded text
 
         other_features = []
-        for key in params.keys():
-            if key != "text":
-                other_features.append(
-                    torch.tensor(params[key]).reshape(batch_size, -1).to(torch.int64)
-                )
+        for i, categorical_variable in enumerate(categorical_variables):
+            other_features.append(
+                torch.tensor(categorical_variable).reshape(batch_size, -1).to(torch.int64)
+            )
 
         other_features = torch.stack(other_features).reshape(batch_size, -1).long()
 
@@ -234,8 +230,7 @@ class FastTextModel(nn.Module):
         confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(
             2
         )  # get the top_k most likely predictions
-        predictions = np.empty((batch_size, top_k)).astype("str")
-
+        predictions = np.argsort(label_scores, axis=1)[:, -top_k:]
         if explain:
             assert not self.direct_bagging, "Direct bagging should be False for explainability"
             # Get back to initial embedding layer:
@@ -265,7 +260,7 @@ class FastTextModel(nn.Module):
         else:
             return predictions, confidence
 
-    def predict_and_explain(self, text, params, top_k=1, n=5, cutoff=0.65):
+    def predict_and_explain(self, text, categorical_variables, top_k=1, n=5, cutoff=0.65):
         """
         Args:
             text (List[str]): A list of sentences.
@@ -290,9 +285,9 @@ class FastTextModel(nn.Module):
             id_to_token_dicts,
             token_to_id_dicts,
             processed_text,
-        ) = self.predict(text=text, params=params, top_k=top_k, explain=True)
-
-        assert not self.direct_bagging, "Direct bagging should be False for explainability"
+        ) = self.predict(
+            text=text, categorical_variables=categorical_variables, top_k=top_k, explain=True
+        )
 
         tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
 

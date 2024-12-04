@@ -379,8 +379,6 @@ class torchFastText:
                 f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
             )
 
-        self.pytorch_model.to(X.device)
-
         return self.pytorch_model.predict(text, categorical_variables, top_k=top_k)
 
     def predict_and_explain(self, X, top_k=1):
@@ -394,8 +392,6 @@ class torchFastText:
             raise Exception(
                 f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
             )
-
-        self.pytorch_model.to(X.device)
 
         return self.pytorch_model.predict_and_explain(text, categorical_variables, top_k=top_k)
 
