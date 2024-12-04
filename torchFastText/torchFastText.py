@@ -9,7 +9,6 @@ from pytorch_lightning.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
-from pytorch_lightning.utilities import rank_zero_only
 from torch.optim import SGD, Adam
 
 from .datasets.dataset import FastTextModelDataset
@@ -26,11 +25,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[logging.StreamHandler()],
 )
-
-
-@rank_zero_only
-def print_progress(*args, **kwargs):
-    print(*args, **kwargs)
 
 
 class torchFastText:
@@ -249,7 +243,7 @@ class torchFastText:
         # Trainer callbacks
         checkpoints = [
             {
-                "monitor": "validation_loss",
+                "monitor": "validation_loss_epoch",
                 "save_top_k": 1,
                 "save_last": False,
                 "mode": "min",
@@ -258,7 +252,7 @@ class torchFastText:
         callbacks = [ModelCheckpoint(**checkpoint) for checkpoint in checkpoints]
         callbacks.append(
             EarlyStopping(
-                monitor="validation_loss",
+                monitor="validation_loss_epoch",
                 patience=patience_train,
                 mode="min",
             )
@@ -273,7 +267,7 @@ class torchFastText:
             max_epochs=num_epochs,
             num_sanity_val_steps=2,
             strategy=strategy,
-            log_every_n_steps=2,
+            log_every_n_steps=1,
             enable_progress_bar=True,
         )
 
@@ -306,7 +300,7 @@ class torchFastText:
 
     def load_from_checkpoint(self, path):
         self.lightning_module = FastTextModule.load_from_checkpoint(
-            self.best_model_path,
+            path,
             model=self.pytorch_model,
             loss=self.loss,
             optimizer=self.optimizer,

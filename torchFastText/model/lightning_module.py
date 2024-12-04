@@ -68,9 +68,11 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("train_loss", loss, on_epoch=True, on_step=True)
+        self.log("train_loss_epoch", loss, on_epoch=True, on_step=False, prog_bar=True)
+        self.log("train_loss_step", loss, on_epoch=False, on_step=True, prog_bar=False)
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log("train_accuracy", accuracy, on_epoch=True, on_step=True)
+        self.log("train_accuracy_epoch", accuracy, on_epoch=True, on_step=False, prog_bar=True)
+        self.log("train_accuracy_step", accuracy, on_epoch=False, on_step=True, prog_bar=False)
 
         return loss
 
@@ -87,10 +89,12 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("validation_loss", loss, on_epoch=True, on_step=True)
+        self.log("validation_loss_epoch", loss, on_epoch=True, on_step=False, prog_bar=True)
+        self.log("validation_loss_step", loss, on_epoch=False, on_step=True, prog_bar=False)
 
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log("validation_accuracy", accuracy, on_epoch=True, on_step=True)
+        self.log("validation_accuracy_epoch", accuracy, on_epoch=True, on_step=False, prog_bar=True)
+        self.log("validation_accuracy_step", accuracy, on_epoch=False, on_step=True, prog_bar=False)
         return loss
 
     def test_step(self, batch, batch_idx: int):
@@ -106,12 +110,10 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("test_loss", loss, on_epoch=True, on_step=True)
 
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log("validation_accuracy", accuracy, on_epoch=True, on_step=True)
 
-        return loss
+        return loss, accuracy
 
     def configure_optimizers(self):
         """
@@ -123,7 +125,7 @@ class FastTextModule(pl.LightningModule):
         scheduler = self.scheduler(optimizer, **self.scheduler_params)
         scheduler = {
             "scheduler": scheduler,
-            "monitor": "validation_loss",
+            "monitor": "validation_loss_epoch",
             "interval": self.scheduler_interval,
         }
 
