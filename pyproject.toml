@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "torchFastText"
-version = "0.0.3"
+version = "0.0.4"
 
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
 
@@ -16,6 +16,7 @@ readme = "README.md"
 repository = "https://github.com/InseeFrLab/torch-fastText"
 
 packages = [{include = "src/torchFastText"}]
+exclude = ["**/__pycache__", "**/*.py[co]"]
 
 classifiers = [
     "Programming Language :: Python :: 3",
