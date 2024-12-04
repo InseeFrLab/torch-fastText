@@ -1,8 +1,15 @@
-# """Efficient""" text classification with Pytorch
+# torch-FastText: Efficient text classification with PyTorch
 
-This repository contains an implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch.
+This repository provides a PyTorch-based package of [the fastText architecture](https://github.com/facebookresearch/) [1].
 
-## References
+#### Installation
+
+  ```bash
+pip install git+https://github.com/inseefrlab/torch-fasttext@package
+  ```
+
+
+#### References
 
 [1] A. Joulin, E. Grave, P. Bojanowski, T. Mikolov, [*Bag of Tricks for Efficient Text Classification*](https://arxiv.org/abs/1607.01759)
 
