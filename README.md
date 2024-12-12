@@ -1,15 +1,88 @@
-# torch-FastText: Efficient text classification with PyTorch
+## torchFastText
 
-This repository provides a PyTorch-based package of [the fastText architecture](https://github.com/facebookresearch/) [1].
+A flexible PyTorch implementation of FastText for text classification with support for categorical features.
 
-#### Installation
+## Features
 
-  ```bash
-pip install git+https://github.com/inseefrlab/torch-fasttext@package
-  ```
+- Supports text classification with FastText architecture
+- Handles both text and categorical features
+- N-gram tokenization
+- Flexible optimizer and scheduler options
+- GPU and CPU support
+- Model checkpointing and early stopping
+- Prediction and model explanation capabilities
+
+## Installation
+
+```bash
+pip install torch-fasttext
+```
+
+## Key Components
+
+- `build()`: Constructs the FastText model architecture
+- `train()`: Trains the model with built-in callbacks and logging
+- `predict()`: Generates class predictions
+- `predict_and_explain()`: Provides predictions with feature attributions
+
+## Subpackages
+
+- `explainability`: Simple methods to visualize feature attributions at word and letter levels
+- `preprocess`: To preprocess text input, using `nltk` and `unidecode` libraries.
 
 
-#### References
+## Quick Start
+
+```python
+from torch_fasttext import torchFastText
+
+# Initialize the model
+model = torchFastText(
+    num_buckets=1000000,
+    embedding_dim=100,
+    min_count=5,
+    min_n=3,
+    max_n=6,
+    len_word_ngrams=True,
+    sparse=True
+)
+
+# Train the model
+model.train(
+    X_train=train_data,
+    y_train=train_labels,
+    X_val=val_data,
+    y_val=val_labels,
+    num_epochs=10,
+    batch_size=64
+)
+# Make predictions
+predictions = model.predict(test_data)
+```
+
+where ```train_data``` is an array of size $(N,d)$, having the text in string format in the first column, the other columns containing tokenized categorical variables in `int` format.
+
+Please make sure `y_train` contains at least one time each possible label: a function `stratified_split_rare_labels` is available in the `preprocess` subpackage.
+
+## Dependencies
+
+- PyTorch Lightning
+- NumPy
+
+## Documentation
+
+For detailed usage and examples, please refer to the [experiments notebook](experiments.ipynb). Use `pip install -r requirements.txt` after cloning the repository to install the necessary dependencies (some are specific for the notebook).
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT
+## References
+
+Inspired by the original FastText paper [1] and implementation.
 
 [1] A. Joulin, E. Grave, P. Bojanowski, T. Mikolov, [*Bag of Tricks for Efficient Text Classification*](https://arxiv.org/abs/1607.01759)
 

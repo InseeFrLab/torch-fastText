@@ -4,14 +4,7 @@ numpy
 pandas
 scikit-learn
 pyarrow
-mlflow
 nltk
-torch
-pytorch_lightning
-pandas
-scikit-learn
-pyarrow
-mlflow
 unidecode
 captum
 ipywidgets
