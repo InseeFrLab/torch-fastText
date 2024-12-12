@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "torchFastText"
-version = "0.0.5"
+version = "0.0.0"
 
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
 
@@ -29,10 +29,14 @@ keywords = ["fastText", "text classification", "NLP", "automatic coding", "deep 
 python = "^3.10.0"
 numpy = "1.26.4"
 pytorch-lightning = "^2.4.0"
-captum = "^0.7.0"
-unidecode = "^1.3.8"
-nltk = "^3.9.1"
-scikit-learn = "^1.5.2"
+
+[tool.poetry.extras]
+optional = [
+    "captum",
+    "unidecode",
+    "nltk",
+    "scikit-learn"
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
