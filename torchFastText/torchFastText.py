@@ -129,6 +129,103 @@ class torchFastText:
                 scheduler_interval="epoch",
             )
 
+    def build_data_loaders(self, X_train, y_train, X_val, y_val, batch_size, num_workers):
+        """
+        A public method to build the dataloaders, with few arguments and running checks.
+
+        Args:
+            X_train (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
+            y_train (np.ndarray): Array of shape (N,) with the labels.
+            X_val (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
+            y_val (np.ndarray): Array of shape (N,) with the labels.
+            batch_size (int): Batch size.
+            num_workers (int): Number of workers for the dataloaders.
+
+        Returns:
+            Tuple[torch.utils.data.DataLoader]: Training and validation dataloaders.
+
+        """
+
+        training_text, train_categorical_variables, train_no_cat_var = check_X(X_train)
+        val_text, val_categorical_variables, val_no_cat_var = check_X(X_val)
+        y_train = check_Y(y_train)
+        y_val = check_Y(y_val)
+
+        # Datasets and dataloaders
+        train_dataset = FastTextModelDataset(
+            categorical_variables=train_categorical_variables,
+            texts=training_text,
+            outputs=y_train,
+            tokenizer=self.tokenizer,
+        )
+        val_dataset = FastTextModelDataset(
+            categorical_variables=val_categorical_variables,
+            texts=val_text,
+            outputs=y_val,
+            tokenizer=self.tokenizer,
+        )
+
+        train_dataloader = train_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+        val_dataloader = val_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+
+        return train_dataloader, val_dataloader
+
+    def __build_data_loaders(
+        self,
+        train_categorical_variables,
+        training_text,
+        y_train,
+        val_categorical_variables,
+        val_text,
+        y_val,
+        batch_size,
+        num_workers,
+    ):
+        """
+        A private method to build the dataloaders, without running checks.
+        Used in train method (where checks are run beforehand).
+
+        Args:
+            train_categorical_variables (np.ndarray): Array of shape (N_train,d-1) with the categorical variables.
+            training_text (np.ndarray): Array of shape (N_train,) with the text in string format
+            y_train (np.ndarray): Array of shape (N_train,) with the labels.
+            val_categorical_variables (np.ndarray): Array of shape (N_val,d-1) with the categorical variables.
+            val_text (np.ndarray): Array of shape (N_val,) with the text in string format
+            y_val (np.ndarray): Array of shape (N_val,) with the labels.
+            batch_size (int): Batch size.
+            num_workers (int): Number of workers for the dataloaders.
+
+        Returns:
+            Tuple[torch.utils.data.DataLoader]: Training and validation dataloaders.
+        """
+
+        # Datasets and dataloaders
+        train_dataset = FastTextModelDataset(
+            categorical_variables=train_categorical_variables,
+            texts=training_text,
+            outputs=y_train,
+            tokenizer=self.tokenizer,
+        )
+        val_dataset = FastTextModelDataset(
+            categorical_variables=val_categorical_variables,
+            texts=val_text,
+            outputs=y_val,
+            tokenizer=self.tokenizer,
+        )
+
+        train_dataloader = train_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+        val_dataloader = val_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+
+        return train_dataloader, val_dataloader
+
     def train(
         self,
         X_train: np.ndarray,
@@ -216,25 +313,16 @@ class torchFastText:
 
         self.pytorch_model = self.pytorch_model.to(self.device)
 
-        # Datasets and dataloaders
-        train_dataset = FastTextModelDataset(
-            categorical_variables=train_categorical_variables,
-            texts=training_text,
-            outputs=y_train,
-            tokenizer=self.tokenizer,
-        )
-        val_dataset = FastTextModelDataset(
-            categorical_variables=val_categorical_variables,
-            texts=val_text,
-            outputs=y_val,
-            tokenizer=self.tokenizer,
-        )
-
-        train_dataloader = train_dataset.create_dataloader(
-            batch_size=batch_size, num_workers=num_workers
-        )
-        val_dataloader = val_dataset.create_dataloader(
-            batch_size=batch_size, num_workers=num_workers
+        # Dataloaders
+        train_dataloader, val_dataloader = self.__build_data_loaders(
+            train_categorical_variables=train_categorical_variables,
+            training_text=training_text,
+            y_train=y_train,
+            val_categorical_variables=val_categorical_variables,
+            val_text=val_text,
+            y_val=y_val,
+            batch_size=batch_size,
+            num_workers=num_workers,
         )
 
         if verbose:
