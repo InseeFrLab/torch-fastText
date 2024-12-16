@@ -15,7 +15,7 @@ A flexible PyTorch implementation of FastText for text classification with suppo
 ## Installation
 
 ```bash
-pip install torch-fasttext
+pip install torchFastText
 ```
 
 ## Key Components
@@ -34,7 +34,7 @@ pip install torch-fasttext
 ## Quick Start
 
 ```python
-from torch_fasttext import torchFastText
+from torchFastText import torchFastText
 
 # Initialize the model
 model = torchFastText(
@@ -62,7 +62,7 @@ predictions = model.predict(test_data)
 
 where ```train_data``` is an array of size $(N,d)$, having the text in string format in the first column, the other columns containing tokenized categorical variables in `int` format.
 
-Please make sure `y_train` contains at least one time each possible label: a function `stratified_split_rare_labels` is available in the `preprocess` subpackage.
+Please make sure `y_train` contains at least one time each possible label.
 
 ## Dependencies
 
