@@ -5,9 +5,15 @@ Integrates additional categorical features.
 
 from typing import List
 
-import numpy as np
 import torch
-from captum.attr import LayerIntegratedGradients
+
+try:
+    from captum.attr import LayerIntegratedGradients
+
+    HAS_CAPTUM = True
+except ImportError:
+    HAS_CAPTUM = False
+
 from torch import nn
 
 from ..utilities.utils import (
@@ -142,11 +148,11 @@ class FastTextModel(nn.Module):
 
         Returns:
         if explain is False:
-            predictions (np.ndarray): A numpy array containing the top_k most likely codes to the query.
-            confidence (np.ndarray): A numpy array containing the corresponding confidence scores.
+            predictions (torch.Tensor, shape (len(text), top_k)): A tensor containing the top_k most likely codes to the query.
+            confidence (torch.Tensor, shape (len(text), top_k)): A tensor array containing the corresponding confidence scores.
         if explain is True:
-            predictions (np.ndarray, shape (len(text), top_k)): Containing the top_k most likely codes to the query.
-            confidence (np.ndarray, shape (len(text), top_k)): Corresponding confidence scores.
+            predictions (torch.Tensor, shape (len(text), top_k)): Containing the top_k most likely codes to the query.
+            confidence (torch.Tensor, shape (len(text), top_k)): Corresponding confidence scores.
             all_attributions (torch.Tensor, shape (len(text), top_k, seq_len)): A tensor containing the attributions for each token in the text.
             x (torch.Tensor): A tensor containing the token indices of the text.
             id_to_token_dicts (List[Dict[int, str]]): A list of dictionaries mapping token indices to tokens (one for each sentence).
@@ -156,6 +162,10 @@ class FastTextModel(nn.Module):
 
         flag_change_embed = False
         if explain:
+            if not HAS_CAPTUM:
+                raise ImportError(
+                    "Captum is not installed and is required for explainability. Run 'pip install torchFastText[explainability]'."
+                )
             if self.direct_bagging:
                 # Get back the classical embedding layer for explainability
                 new_embed_layer = nn.Embedding(
@@ -183,25 +193,18 @@ class FastTextModel(nn.Module):
         indices_batch, id_to_token_dicts, token_to_id_dicts = self.tokenizer.tokenize(
             text, text_tokens=False
         )
-        max_tokens = max([len(indices) for indices in indices_batch])
 
         padding_index = (
             self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
         )  # padding index, the integer value of the padding token
-        padded_batch = [
-            np.pad(
-                indices,
-                (0, max_tokens - len(indices)),
-                "constant",
-                constant_values=padding_index,
-            )
-            for indices in indices_batch
-        ]
-        padded_batch = np.stack(padded_batch)
 
-        x = torch.LongTensor(padded_batch.astype(np.int32)).reshape(
-            batch_size, -1
+        padded_batch = torch.nn.utils.rnn.pad_sequence(
+            indices_batch,
+            batch_first=True,
+            padding_value=padding_index,
         )  # (batch_size, seq_len) - Tokenized (int) + padded text
+
+        x = padded_batch
 
         other_features = []
         for i, categorical_variable in enumerate(categorical_variables):
@@ -214,25 +217,24 @@ class FastTextModel(nn.Module):
         pred = self(
             x, other_features
         )  # forward pass, contains the prediction scores (len(text), num_classes)
-        label_scores = pred.detach().cpu().numpy()
-        top_k_indices = np.argsort(label_scores, axis=1)[:, -top_k:]
+        label_scores = pred.detach().cpu()
+        label_scores_topk = torch.topk(label_scores, k=top_k, dim=1)
+
+        predictions = label_scores_topk.indices  # get the top_k most likely predictions
+        confidence = torch.round(label_scores_topk.values, decimals=2)  # and their scores
+
         if explain:
             assert not self.direct_bagging, "Direct bagging should be False for explainability"
             all_attributions = []
             for k in range(top_k):
                 attributions = lig.attribute(
-                    (x, other_features), target=torch.Tensor(top_k_indices[:, k]).long()
+                    (x, other_features), target=torch.Tensor(predictions[:, k]).long()
                 )  # (batch_size, seq_len)
                 attributions = attributions.sum(dim=-1)
                 all_attributions.append(attributions.detach().cpu())
+
             all_attributions = torch.stack(all_attributions, dim=1)  # (batch_size, top_k, seq_len)
 
-        confidence = np.take_along_axis(label_scores, top_k_indices, axis=1).round(
-            2
-        )  # get the top_k most likely predictions
-        predictions = np.argsort(label_scores, axis=1)[:, -top_k:]
-        if explain:
-            assert not self.direct_bagging, "Direct bagging should be False for explainability"
             # Get back to initial embedding layer:
             # EmbeddingBag -> Embedding -> EmbeddingBag
             # or keep Embedding with no change
@@ -271,8 +273,8 @@ class FastTextModel(nn.Module):
             cutoff (float): mapping processed to original words: minimum similarity score to consider a candidate processed word (default: 0.75)
 
         Returns:
-            predictions (np.ndarray): A numpy array containing the top_k most likely codes to the query.
-            confidence (np.ndarray): A numpy array containing the corresponding confidence scores.
+            predictions (torch.Tensor, shape (len(text), top_k)): Containing the top_k most likely codes to the query.
+            confidence (torch.Tensor, shape (len(text), top_k)): Corresponding confidence scores.
             all_scores (List[List[List[float]]]): For each sentence, list of the top_k lists of attributions for each word in the sentence (one for each pred).
         """
 

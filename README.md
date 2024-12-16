@@ -71,7 +71,7 @@ Please make sure `y_train` contains at least one time each possible label: a fun
 
 ## Documentation
 
-For detailed usage and examples, please refer to the [experiments notebook](experiments.ipynb). Use `pip install -r requirements.txt` after cloning the repository to install the necessary dependencies (some are specific for the notebook).
+For detailed usage and examples, please refer to the [experiments notebook](experiments.ipynb). Use `pip install -r requirements.txt` after cloning the repository to install the necessary dependencies (some are specific to the notebook).
 
 ## Contributing
 

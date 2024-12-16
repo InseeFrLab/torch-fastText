@@ -31,12 +31,8 @@ numpy = "1.26.4"
 pytorch-lightning = "^2.4.0"
 
 [tool.poetry.extras]
-optional = [
-    "captum",
-    "unidecode",
-    "nltk",
-    "scikit-learn"
-]
+explainability = ["unidecode", "nltk", "captum"]
+preprocess =     ["unidecode", "nltk"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -58,16 +58,17 @@ def visualize_letter_scores(all_scores_letters, original_texts, pred):
 
         for idx, lett in enumerate(all_letters):
             if lett == " ":
-                all_scores_letters = np.insert(all_scores_letters, idx, 0, axis=1)
+                all_scores_letters = np.insert(all_scores_letters, idx, 0, axis=2)
 
         colors = sns.color_palette("mako", n_colors=topk)
         scores = all_scores_letters
         plt.figure(figsize=(len(all_letters) / 7, 5))
 
         for k in range(scores.shape[0]):
+            res = scores[0, k].cpu().numpy()
             plt.bar(
-                range(len(scores[k])),
-                scores[k],
+                range(len(res)),
+                res,
                 label=pred[0][k],
                 width=0.5,
                 color=colors[k % len(colors)],

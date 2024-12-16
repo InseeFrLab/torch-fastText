@@ -6,6 +6,7 @@ import ctypes
 from typing import List, Tuple
 
 import numpy as np
+import torch
 
 from ..preprocess import clean_text_feature
 from ..utilities.utils import tokenized_text_in_tokens
@@ -238,7 +239,7 @@ class NGramTokenizer:
 
         id_to_token = {v: k for k, v in all_tokens_id.items()}
 
-        return np.asarray(all_indices), id_to_token, all_tokens_id
+        return torch.Tensor(all_indices), id_to_token, all_tokens_id
 
     def tokenize(self, text: list[str], text_tokens=True):
         """
