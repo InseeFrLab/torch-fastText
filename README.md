@@ -1,4 +1,4 @@
-## torchFastText
+# torchFastText : Efficient text classification with PyTorch
 
 A flexible PyTorch implementation of FastText for text classification with support for categorical features.
 
