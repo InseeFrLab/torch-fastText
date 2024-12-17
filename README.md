@@ -27,8 +27,10 @@ pip install torchFastText
 
 ## Subpackages
 
-- `explainability`: Simple methods to visualize feature attributions at word and letter levels
 - `preprocess`: To preprocess text input, using `nltk` and `unidecode` libraries.
+- `explainability`: Simple methods to visualize feature attributions at word and letter levels, using `captum`library.
+
+Run `pip install torchFastText[preprocess]` or `pip install torchFastText[explainability]` to download these optional dependencies.
 
 
 ## Quick Start

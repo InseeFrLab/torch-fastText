@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "torchFastText"
-version = "0.0.0"
+version = "0.0.1"
 
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
 
