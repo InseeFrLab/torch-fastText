@@ -9,7 +9,6 @@ from pytorch_lightning.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
-from pytorch_lightning.utilities import rank_zero_only
 from torch.optim import SGD, Adam
 
 from .datasets.dataset import FastTextModelDataset
@@ -26,11 +25,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[logging.StreamHandler()],
 )
-
-
-@rank_zero_only
-def print_progress(*args, **kwargs):
-    print(*args, **kwargs)
 
 
 class torchFastText:
@@ -135,6 +129,103 @@ class torchFastText:
                 scheduler_interval="epoch",
             )
 
+    def build_data_loaders(self, X_train, y_train, X_val, y_val, batch_size, num_workers):
+        """
+        A public method to build the dataloaders, with few arguments and running checks.
+
+        Args:
+            X_train (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
+            y_train (np.ndarray): Array of shape (N,) with the labels.
+            X_val (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
+            y_val (np.ndarray): Array of shape (N,) with the labels.
+            batch_size (int): Batch size.
+            num_workers (int): Number of workers for the dataloaders.
+
+        Returns:
+            Tuple[torch.utils.data.DataLoader]: Training and validation dataloaders.
+
+        """
+
+        training_text, train_categorical_variables, train_no_cat_var = check_X(X_train)
+        val_text, val_categorical_variables, val_no_cat_var = check_X(X_val)
+        y_train = check_Y(y_train)
+        y_val = check_Y(y_val)
+
+        # Datasets and dataloaders
+        train_dataset = FastTextModelDataset(
+            categorical_variables=train_categorical_variables,
+            texts=training_text,
+            outputs=y_train,
+            tokenizer=self.tokenizer,
+        )
+        val_dataset = FastTextModelDataset(
+            categorical_variables=val_categorical_variables,
+            texts=val_text,
+            outputs=y_val,
+            tokenizer=self.tokenizer,
+        )
+
+        train_dataloader = train_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+        val_dataloader = val_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+
+        return train_dataloader, val_dataloader
+
+    def __build_data_loaders(
+        self,
+        train_categorical_variables,
+        training_text,
+        y_train,
+        val_categorical_variables,
+        val_text,
+        y_val,
+        batch_size,
+        num_workers,
+    ):
+        """
+        A private method to build the dataloaders, without running checks.
+        Used in train method (where checks are run beforehand).
+
+        Args:
+            train_categorical_variables (np.ndarray): Array of shape (N_train,d-1) with the categorical variables.
+            training_text (np.ndarray): Array of shape (N_train,) with the text in string format
+            y_train (np.ndarray): Array of shape (N_train,) with the labels.
+            val_categorical_variables (np.ndarray): Array of shape (N_val,d-1) with the categorical variables.
+            val_text (np.ndarray): Array of shape (N_val,) with the text in string format
+            y_val (np.ndarray): Array of shape (N_val,) with the labels.
+            batch_size (int): Batch size.
+            num_workers (int): Number of workers for the dataloaders.
+
+        Returns:
+            Tuple[torch.utils.data.DataLoader]: Training and validation dataloaders.
+        """
+
+        # Datasets and dataloaders
+        train_dataset = FastTextModelDataset(
+            categorical_variables=train_categorical_variables,
+            texts=training_text,
+            outputs=y_train,
+            tokenizer=self.tokenizer,
+        )
+        val_dataset = FastTextModelDataset(
+            categorical_variables=val_categorical_variables,
+            texts=val_text,
+            outputs=y_val,
+            tokenizer=self.tokenizer,
+        )
+
+        train_dataloader = train_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+        val_dataloader = val_dataset.create_dataloader(
+            batch_size=batch_size, num_workers=num_workers
+        )
+
+        return train_dataloader, val_dataloader
+
     def train(
         self,
         X_train: np.ndarray,
@@ -222,25 +313,16 @@ class torchFastText:
 
         self.pytorch_model = self.pytorch_model.to(self.device)
 
-        # Datasets and dataloaders
-        train_dataset = FastTextModelDataset(
-            categorical_variables=train_categorical_variables,
-            texts=training_text,
-            outputs=y_train,
-            tokenizer=self.tokenizer,
-        )
-        val_dataset = FastTextModelDataset(
-            categorical_variables=val_categorical_variables,
-            texts=val_text,
-            outputs=y_val,
-            tokenizer=self.tokenizer,
-        )
-
-        train_dataloader = train_dataset.create_dataloader(
-            batch_size=batch_size, num_workers=num_workers
-        )
-        val_dataloader = val_dataset.create_dataloader(
-            batch_size=batch_size, num_workers=num_workers
+        # Dataloaders
+        train_dataloader, val_dataloader = self.__build_data_loaders(
+            train_categorical_variables=train_categorical_variables,
+            training_text=training_text,
+            y_train=y_train,
+            val_categorical_variables=val_categorical_variables,
+            val_text=val_text,
+            y_val=y_val,
+            batch_size=batch_size,
+            num_workers=num_workers,
         )
 
         if verbose:
@@ -249,7 +331,7 @@ class torchFastText:
         # Trainer callbacks
         checkpoints = [
             {
-                "monitor": "validation_loss",
+                "monitor": "validation_loss_epoch",
                 "save_top_k": 1,
                 "save_last": False,
                 "mode": "min",
@@ -258,7 +340,7 @@ class torchFastText:
         callbacks = [ModelCheckpoint(**checkpoint) for checkpoint in checkpoints]
         callbacks.append(
             EarlyStopping(
-                monitor="validation_loss",
+                monitor="validation_loss_epoch",
                 patience=patience_train,
                 mode="min",
             )
@@ -273,7 +355,7 @@ class torchFastText:
             max_epochs=num_epochs,
             num_sanity_val_steps=2,
             strategy=strategy,
-            log_every_n_steps=2,
+            log_every_n_steps=1,
             enable_progress_bar=True,
         )
 
@@ -306,7 +388,7 @@ class torchFastText:
 
     def load_from_checkpoint(self, path):
         self.lightning_module = FastTextModule.load_from_checkpoint(
-            self.best_model_path,
+            path,
             model=self.pytorch_model,
             loss=self.loss,
             optimizer=self.optimizer,
@@ -385,8 +467,6 @@ class torchFastText:
                 f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
             )
 
-        self.pytorch_model.to(X.device)
-
         return self.pytorch_model.predict(text, categorical_variables, top_k=top_k)
 
     def predict_and_explain(self, X, top_k=1):
@@ -400,8 +480,6 @@ class torchFastText:
             raise Exception(
                 f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
             )
-
-        self.pytorch_model.to(X.device)
 
         return self.pytorch_model.predict_and_explain(text, categorical_variables, top_k=top_k)
 

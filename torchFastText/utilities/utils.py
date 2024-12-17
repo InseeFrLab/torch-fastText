@@ -5,9 +5,8 @@ Utility functions.
 import difflib
 from difflib import SequenceMatcher
 
-import numpy as np
 import torch
-from scipy.special import softmax
+import torch.nn.functional as F
 
 from ..preprocess import clean_text_feature
 
@@ -111,11 +110,13 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
         Dict[str, List[int]]: Mapping from word to list of token indexes.
 
     """
+
     pointer_token = 0
     res = {}
-    processed_words = sentence.split()
+    processed_sentence = clean_text_feature([sentence], remove_stop_words=False)[0]
+    processed_words = processed_sentence.split()
     # we know the tokens are in the right order
-    for index_word, word in enumerate(sentence.split()):
+    for index_word, word in enumerate(processed_sentence.split()):
         if word not in res:
             res[word] = []
 
@@ -142,8 +143,8 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
     # starting word n_gram
     pointer_token += 1
     while pointer_token < len(tokenized_sentence_tokens):
-        for index_word, word in enumerate(sentence.split()):
-            token = tokenized_sentence_tokens[pointer_token]
+        token = tokenized_sentence_tokens[pointer_token]
+        for index_word, word in enumerate(processed_sentence.split()):
             # now, the condition of matching changes: we need to find the word in the token
             if word in token:
                 res[word].append(pointer_token)
@@ -152,6 +153,9 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
     assert pointer_token == len(tokenized_sentence_tokens)
     assert set(sum([v for v in res.values()], [end_of_string_position])) == set(
         range(len(tokenized_sentence_tokens))
+    ), print(
+        set(range(len(tokenized_sentence_tokens)))
+        - set(sum([v for v in res.values()], [end_of_string_position]))
     )  # verify if all tokens are used
 
     return res
@@ -225,7 +229,7 @@ def compute_word_score(word_to_score_dicts, text, n=5, cutoff=0.75):
         List[List[List[float]]]: For each sentence, list of top-k scores for each word.
     """
 
-    full_all_scores = []
+    all_scores_text = []
     mappings = []
     for idx, word_to_score_topk in enumerate(word_to_score_dicts):  # iteration over sentences
         all_scores_topk = []
@@ -248,14 +252,17 @@ def compute_word_score(word_to_score_dicts, text, n=5, cutoff=0.75):
                 word_score = word_to_score[matching_processed_word]
                 scores.append(word_score)
 
-            scores = softmax(scores)  # softmax normalization. Length = len(original_words)
+            scores = torch.tensor(scores)
+            scores = F.softmax(
+                scores, dim=-1
+            )  # softmax normalization. Length = len(original_words)
             scores[stopwords_idx] = 0
 
             all_scores_topk.append(scores)  # length top_k
 
-        full_all_scores.append(all_scores_topk)  # length = len(text)
+        all_scores_text.append(all_scores_topk)  # length = len(text)
 
-    return full_all_scores, mappings
+    return all_scores_text, mappings
 
 
 def explain_continuous(
@@ -274,10 +281,11 @@ def explain_continuous(
         top_k (int): Number of top tokens to consider.
 
     Returns:
-        np.array: Array of letter scores.
+        List[torch.Tensor]: List of letter scores for each sentence.
 
 
     """
+    all_scores_text = []
     for idx, processed_sentence in enumerate(processed_text):
         tokenized_sentence_tokens = tokenized_text_tokens[idx]
         mapping = mappings[idx]
@@ -300,19 +308,19 @@ def explain_continuous(
             ]
             original_to_token_idxs[original] = associated_token_idx
 
-        all_scores_letter_topk = []
+        scores_for_k = []
         for k in range(top_k):
-            all_scores_letter = []
+            scores_for_words = []
             for xxx, original_word in enumerate(original_words):
                 original_word_prepro = clean_text_feature([original_word], remove_stop_words=False)[
                     0
                 ]
 
                 letters = list(original_word)
-                scores_letter = np.zeros(len(letters))
+                scores_letter = torch.zeros(len(letters), dtype=torch.float32)
 
                 if original_word not in original_to_token:  # if stopword, 0
-                    all_scores_letter.append(scores_letter)
+                    scores_for_words.append(scores_letter)
                     continue
 
                 for pos, token in enumerate(original_to_token[original_word]):
@@ -325,12 +333,14 @@ def explain_continuous(
                     a, _, size = sm.find_longest_match()
                     scores_letter[a : a + size] += score_token
 
-                all_scores_letter.append(scores_letter)
+                scores_for_words.append(scores_letter)
 
-            all_scores_letter = np.hstack(all_scores_letter)
-            scores = softmax(all_scores_letter)
+            all_scores_letter = torch.cat(scores_for_words)
+            scores = F.softmax(all_scores_letter, dim=-1)
             scores[all_scores_letter == 0] = 0
+            scores_for_k.append(scores)
 
-            all_scores_letter_topk.append(scores)
-        all_scores_letter_topk = np.vstack(all_scores_letter_topk)
-    return all_scores_letter_topk
+        scores_for_sentence = torch.stack(scores_for_k)
+        all_scores_text.append(scores_for_sentence)
+
+    return torch.stack(all_scores_text)

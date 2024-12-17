@@ -4,12 +4,23 @@ Processing fns.
 
 import string
 
-import nltk
 import numpy as np
-import unidecode
-from nltk.corpus import stopwords as ntlk_stopwords
-from nltk.stem.snowball import SnowballStemmer
-from sklearn.model_selection import train_test_split
+
+try:
+    import nltk
+    from nltk.corpus import stopwords as ntlk_stopwords
+    from nltk.stem.snowball import SnowballStemmer
+
+    HAS_NLTK = True
+except ImportError:
+    HAS_NLTK = False
+
+try:
+    import unidecode
+
+    HAS_UNIDECODE = True
+except ImportError:
+    HAS_UNIDECODE = False
 
 
 def clean_text_feature(text: list[str], remove_stop_words=True):
@@ -24,7 +35,17 @@ def clean_text_feature(text: list[str], remove_stop_words=True):
         list[str]: List of cleaned text descriptions.
 
     """
+    if not HAS_NLTK:
+        raise ImportError(
+            "nltk is not installed and is required for preprocessing. Run 'pip install torchFastText[preprocess]'."
+        )
+    if not HAS_UNIDECODE:
+        raise ImportError(
+            "unidecode is not installed and is required for preprocessing. Run 'pip install torchFastText[preprocess]'."
+        )
+
     # Define stopwords and stemmer
+
     nltk.download("stopwords", quiet=True)
     stopwords = tuple(ntlk_stopwords.words("french")) + tuple(string.ascii_lowercase)
     stemmer = SnowballStemmer(language="french")
@@ -59,33 +80,3 @@ def clean_text_feature(text: list[str], remove_stop_words=True):
 
     # Return clean DataFrame
     return text
-
-
-def stratified_split_rare_labels(X, y, test_size=0.2, min_train_samples=1):
-    # Get unique labels and their frequencies
-    unique_labels, label_counts = np.unique(y, return_counts=True)
-
-    # Separate rare and common labels
-    rare_labels = unique_labels[label_counts == 1]
-
-    # Create initial mask for rare labels to go into training set
-    rare_label_mask = np.isin(y, rare_labels)
-
-    # Separate data into rare and common label datasets
-    X_rare = X[rare_label_mask]
-    y_rare = y[rare_label_mask]
-    X_common = X[~rare_label_mask]
-    y_common = y[~rare_label_mask]
-
-    # Split common labels stratified
-    X_common_train, X_common_test, y_common_train, y_common_test = train_test_split(
-        X_common, y_common, test_size=test_size, stratify=y_common
-    )
-
-    # Combine rare labels with common labels split
-    X_train = np.concatenate([X_rare, X_common_train])
-    y_train = np.concatenate([y_rare, y_common_train])
-    X_test = X_common_test
-    y_test = y_common_test
-
-    return X_train, X_test, y_train, y_test

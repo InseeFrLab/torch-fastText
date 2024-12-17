@@ -4,7 +4,6 @@ Dataset class for a FastTextModel without the fastText dependency.
 
 from typing import List
 
-import numpy as np
 import torch
 
 from .tokenizer import NGramTokenizer
@@ -84,19 +83,29 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         """
         # Get inputs
         text = [item[0] for item in batch]
-        categorical_variables = [item[1] for item in batch]
         y = [item[-1] for item in batch]
+
         indices_batch = [self.tokenizer.indices_matrix(sentence)[0] for sentence in text]
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
         padded_batch = torch.nn.utils.rnn.pad_sequence(
-            [torch.LongTensor(indices) for indices in indices_batch],
+            indices_batch,
             batch_first=True,
             padding_value=padding_index,
         )
-        categorical_tensors = torch.Tensor(
-            np.vstack(categorical_variables)
-        )  # (batch_size, num_categorical_features)
+        if self.categorical_variables is not None:
+            categorical_variables = [item[1] for item in batch]
+            categorical_tensors = torch.stack(
+                [torch.tensor(cat_var, dtype=torch.float32) for cat_var in categorical_variables]
+            )  # (batch_size, num_categorical_features)
+
+        else:
+            categorical_tensors = torch.empty(
+                padded_batch.shape[0], 1
+            )  # (batch_size, 1), fake tensor to avoid warning "ambiguous collection" from lightning
+            # This tensor is ignored by the PyTorch model awnyway (no_cat_var = True)
+
         y = torch.LongTensor(y)
+
         return (padded_batch, categorical_tensors, y)
 
     def create_dataloader(
