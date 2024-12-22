@@ -27,7 +27,7 @@ keywords = ["fastText", "text classification", "NLP", "automatic coding", "deep 
 
 [tool.poetry.dependencies]
 python = "^3.10.0"
-numpy = "1.26.4"
+numpy = "2.2.1"
 pytorch-lightning = "^2.4.0"
 
 [tool.poetry.extras]
