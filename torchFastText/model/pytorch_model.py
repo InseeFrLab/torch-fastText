@@ -206,13 +206,17 @@ class FastTextModel(nn.Module):
 
         x = padded_batch
 
-        other_features = []
-        for i, categorical_variable in enumerate(categorical_variables):
-            other_features.append(
-                torch.tensor(categorical_variable).reshape(batch_size, -1).to(torch.int64)
-            )
+        
+        if not self.no_cat_var:
+            other_features = []
+            for i, categorical_variable in enumerate(categorical_variables):
+                other_features.append(
+                    torch.tensor(categorical_variable).reshape(batch_size, -1).to(torch.int64)
+                )
 
-        other_features = torch.stack(other_features).reshape(batch_size, -1).long()
+            other_features = torch.stack(other_features).reshape(batch_size, -1).long()
+        else:
+            other_features = torch.empty(batch_size)
 
         pred = self(
             x, other_features
@@ -301,6 +305,7 @@ class FastTextModel(nn.Module):
                 all_attr,
                 id_to_token_dicts,
                 token_to_id_dicts,
+                min_n=self.tokenizer.min_n,
                 padding_index=2009603,
                 end_of_string_index=0,
             )

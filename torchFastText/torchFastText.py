@@ -428,10 +428,13 @@ class torchFastText:
         text, categorical_variables, no_cat_var = check_X(X)
         y = check_Y(Y)
 
-        if categorical_variables.shape[1] != self.num_categorical_features:
-            raise Exception(
-                f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
-            )
+        if categorical_variables is not None:
+            if categorical_variables.shape[1] != self.num_categorical_features:
+                raise Exception(
+                    f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
+                )
+        else:
+            assert self.pytorch_model.no_cat_var == True
 
         self.pytorch_model.to(X.device)
 
@@ -462,10 +465,13 @@ class torchFastText:
 
         # checking right format for inputs
         text, categorical_variables, no_cat_var = check_X(X)
-        if categorical_variables.shape[1] != self.num_categorical_features:
-            raise Exception(
-                f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
-            )
+        if categorical_variables is not None:
+            if categorical_variables.shape[1] != self.num_categorical_features:
+                raise Exception(
+                    f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
+                )
+        else:
+            assert self.pytorch_model.no_cat_var == True
 
         return self.pytorch_model.predict(text, categorical_variables, top_k=top_k)
 
@@ -475,11 +481,13 @@ class torchFastText:
 
         # checking right format for inputs
         text, categorical_variables, no_cat_var = check_X(X)
-
-        if categorical_variables.shape[1] != self.num_categorical_features:
-            raise Exception(
-                f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
-            )
+        if categorical_variables is not None:
+            if categorical_variables.shape[1] != self.num_categorical_features:
+                raise Exception(
+                    f"X must have the same number of categorical variables as the training data ({self.num_categorical_features})."
+                )
+        else:
+            assert self.pytorch_model.no_cat_var == True
 
         return self.pytorch_model.predict_and_explain(text, categorical_variables, top_k=top_k)
 
