@@ -30,7 +30,8 @@ jobs:
         run: |
           # NOTE: put your own distribution build steps here.
           python -m pip install build poetry
-          python -m build
+          poetry install
+          poetry build
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
