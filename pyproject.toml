@@ -1,6 +1,5 @@
 [project]
 name = "torchFastText"
-version = "0.0.8"
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
 authors = [
     { name = "Tom Seimandi", email = "tom.seimandi@gmail.com" },
@@ -22,6 +21,8 @@ dependencies = [
     "pytorch-lightning>=2.4.0"
 ]
 requires-python = ">=3.10"
+dynamic = ["version"]
+
 
 [project.optional-dependencies]
 explainability = ["unidecode", "nltk", "captum"]
@@ -33,3 +34,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 100
+
+[tool.poetry]
+version = "0.0.1-dev"  # base version
+
+[tool.poetry.requires-plugins]
+poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
