@@ -9,7 +9,6 @@ authors = [
 ]
 readme = "README.md"
 repository = "https://github.com/InseeFrLab/torch-fastText"
-packages = [{include = "torchFastText"}]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -37,6 +36,7 @@ line-length = 100
 
 [tool.poetry]
 version = "0.0.1-dev"  # base version
+packages = [{include = "torchFastText"}]
 
 [tool.poetry.requires-plugins]
 poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
