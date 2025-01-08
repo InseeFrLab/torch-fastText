@@ -1,7 +1,7 @@
 """
 Utility functions.
 """
-
+import warnings
 import difflib
 from difflib import SequenceMatcher
 
@@ -80,7 +80,7 @@ def map_processed_to_original(processed_words, original_words, n=1, cutoff=0.9):
     return word_mapping
 
 
-def test_end_of_word(all_processed_words, word, target_token, next_token):
+def test_end_of_word(all_processed_words, word, target_token, next_token, min_n):
     flag = False
     if target_token[-1] == ">":
         if next_token[0] == "<":
@@ -90,7 +90,7 @@ def test_end_of_word(all_processed_words, word, target_token, next_token):
                 flag = False
             if next_token[1] != word[0]:
                 flag = True
-            if len(next_token) == 3:
+            if len(next_token) == min_n:
                 flag = True
         if next_token in all_processed_words:
             flag = True
@@ -98,7 +98,7 @@ def test_end_of_word(all_processed_words, word, target_token, next_token):
     return flag
 
 
-def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
+def match_word_to_token_indexes(sentence, tokenized_sentence_tokens, min_n):
     """
     Match words to token indexes in a sentence.
 
@@ -116,7 +116,7 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
     processed_sentence = clean_text_feature([sentence], remove_stop_words=False)[0]
     processed_words = processed_sentence.split()
     # we know the tokens are in the right order
-    for index_word, word in enumerate(processed_sentence.split()):
+    for index_word, word in enumerate(processed_words):
         if word not in res:
             res[word] = []
 
@@ -128,8 +128,16 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens):
             word,
             tokenized_sentence_tokens[pointer_token],
             tokenized_sentence_tokens[pointer_token + 1],
+            min_n=min_n
         ):
             pointer_token += 1
+            if pointer_token == len(tokenized_sentence_tokens)-1:
+                warnings.warn("Error in the tokenization of the sentence")
+                # workaround to avoid error: each word is asociated to regular ranges
+                chunck = len(tokenized_sentence_tokens) // len(processed_words)
+                for idx, word in enumerate(processed_words):
+                    res[word] = range(idx * chunck, min((idx + 1) * chunck, len(tokenized_sentence_tokens)))
+                return res
 
         pointer_token += 1
         end = pointer_token
@@ -168,6 +176,7 @@ def compute_preprocessed_word_score(
     scores,
     id_to_token_dicts,
     token_to_id_dicts,
+    min_n,
     padding_index=2009603,
     end_of_string_index=0,
 ):
@@ -193,7 +202,7 @@ def compute_preprocessed_word_score(
 
     for idx, sentence in enumerate(preprocessed_text):
         tokenized_sentence_tokens = tokenized_text_tokens[idx]  # sentence level, List[str]
-        word_to_token_idx = match_word_to_token_indexes(sentence, tokenized_sentence_tokens)
+        word_to_token_idx = match_word_to_token_indexes(sentence, tokenized_sentence_tokens, min_n)
         score_sentence_topk = scores[idx]  # torch.Tensor, token scores, (top_k, seq_len)
 
         # Calculate the score for each token and map to words
@@ -325,7 +334,8 @@ def explain_continuous(
 
                 for pos, token in enumerate(original_to_token[original_word]):
                     pos_token = original_to_token_idxs[original_word][pos]
-                    tok = preprocess_token(token)[0]
+                    #tok = preprocess_token(token)[0]
+                    tok = preprocess_token(token)
                     score_token = all_attr[idx, k, pos_token].item()
 
                     # Embed the token at the right indexes of the word
