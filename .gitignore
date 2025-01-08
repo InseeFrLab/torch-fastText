@@ -169,3 +169,6 @@ data/training_data.txt
 docs/
 fastTextAttention.py
 *.pth
+
+# No lock file
+poetry.lock
