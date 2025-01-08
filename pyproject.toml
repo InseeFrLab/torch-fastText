@@ -1,41 +1,34 @@
-[tool.poetry]
+[project]
 name = "torchFastText"
-version = "0.0.1"
-
+version = "0.0.8"
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
-
 authors = [
-    "Cédric Couralet <cedric.couralet@insee.fr>",
-    "Julien Pramil <julien.pramil@insee.fr>",
-    "Tom Seimandi <tom.seimandi@gmail.com>",
-    "Meilame Tayebjee <meilame.tayebjee@insee.fr>"
+    { name = "Tom Seimandi", email = "tom.seimandi@gmail.com" },
+    { name = "Julien Pramil", email = "julien.pramil@insee.fr" },
+    { name = "Meilame Tayebjee", email = "meilame.tayebjee@insee.fr" },
+    { name = "Cédric Couralet", email = "cedric.couralet@insee.fr" },
 ]
-
 readme = "README.md"
-
 repository = "https://github.com/InseeFrLab/torch-fastText"
-
 packages = [{include = "torchFastText"}]
-
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-
 keywords = ["fastText", "text classification", "NLP", "automatic coding", "deep learning"]
+dependencies = [
+    "numpy>=1.26.4",
+    "pytorch-lightning>=2.4.0"
+]
+requires-python = ">=3.10"
 
-[tool.poetry.dependencies]
-python = "^3.10.0"
-numpy = "1.26.4"
-pytorch-lightning = "^2.4.0"
-
-[tool.poetry.extras]
+[project.optional-dependencies]
 explainability = ["unidecode", "nltk", "captum"]
 preprocess =     ["unidecode", "nltk"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
