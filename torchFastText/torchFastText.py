@@ -461,6 +461,7 @@ class torchFastText:
         loss=torch.nn.CrossEntropyLoss(),
         patience_train=3,
         verbose: bool = False,
+        profiler=None
     ):
         ##### Formatting exception handling #####
 
@@ -566,6 +567,10 @@ class torchFastText:
 
         # Strategy
         strategy = "auto"
+        
+        #Profiler
+        self.profiler = profiler
+        
         # Trainer
         self.trainer = pl.Trainer(
             callbacks=callbacks,
@@ -574,6 +579,7 @@ class torchFastText:
             strategy=strategy,
             log_every_n_steps=1,
             enable_progress_bar=True,
+            profiler=self.profiler
         )
 
         torch.cuda.empty_cache()

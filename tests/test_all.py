@@ -206,3 +206,21 @@ def test_training(data):
         np.asarray(["Nouveau budget présenté par le gouvernement"]), 2
     )
     assert predictions.shape == (1, 2)
+    # "predictions" contains the predicted class for each input text, in int format. Need to decode back to have the string format
+    
+def test_predictions(model, data):
+    X_train, X_test, y_train, y_test = data
+    model.train(
+        np.asarray(X_train),
+        np.asarray(y_train),
+        np.asarray(X_test),
+        np.asarray(y_test),
+        num_epochs=1,
+        batch_size=32,
+        lr=0.001,
+        num_workers=4
+    )
+    predictions= model.predict(np.asarray(X_test))
+    assert predictions[0].shape == (len(X_test),1)
+    assert True, "Predictions completed without errors"
+        
