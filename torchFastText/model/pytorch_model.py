@@ -63,14 +63,12 @@ class FastTextModel(nn.Module):
         self.direct_bagging = direct_bagging
         self.vocab_size = vocab_size
         self.sparse = sparse
-        
 
         if categorical_embedding_dims is not None:
             self.categorical_embedding_dims = categorical_embedding_dims
 
             if len(set(categorical_embedding_dims)) == 1:
-                self.average_cat_embed = True # if categorical embedding dims are the same, we average them before concatenating to the sentence embedding
-
+                self.average_cat_embed = True  # if categorical embedding dims are the same, we average them before concatenating to the sentence embedding
 
         self.embeddings = (
             nn.Embedding(
@@ -90,9 +88,13 @@ class FastTextModel(nn.Module):
             self.no_cat_var = False
             for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
                 if categorical_embedding_dims is not None:
-                    emb = nn.Embedding(embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=vocab_size) # concatenate to sentence embedding
+                    emb = nn.Embedding(
+                        embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=vocab_size
+                    )  # concatenate to sentence embedding
                 else:
-                    emb = nn.Embedding(embedding_dim=embedding_dim, num_embeddings=vocab_size) # sum to sentence embedding
+                    emb = nn.Embedding(
+                        embedding_dim=embedding_dim, num_embeddings=vocab_size
+                    )  # sum to sentence embedding
                 self.categorical_embedding_layers[var_idx] = emb
                 setattr(self, "emb_{}".format(var_idx), emb)
         else:
@@ -133,18 +135,28 @@ class FastTextModel(nn.Module):
         # Embed categorical variables
         x_cat = []
         if not self.no_cat_var:
-            for i, (variable, embedding_layer) in enumerate(self.categorical_embedding_layers.items()):
+            for i, (variable, embedding_layer) in enumerate(
+                self.categorical_embedding_layers.items()
+            ):
                 x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
 
         if len(x_cat) > 0:  # if there are categorical variables
-            if self.categorical_embedding_dims is not None: # concatenate to sentence embedding
-                if self.average_cat_embed: # unique cat_embedding_dim for all categorical variables
-                    x_cat = torch.stack(x_cat, dim=0).mean(dim=0) # average over all the categorical variables, output shape is (batch_size, cat_embedding_dim)
-                    x_in = torch.cat([x_1, x_cat], dim=1)  # (batch_size, embedding_dim + cat_embedding_dim)
+            if self.categorical_embedding_dims is not None:  # concatenate to sentence embedding
+                if self.average_cat_embed:  # unique cat_embedding_dim for all categorical variables
+                    x_cat = torch.stack(
+                        x_cat, dim=0
+                    ).mean(
+                        dim=0
+                    )  # average over all the categorical variables, output shape is (batch_size, cat_embedding_dim)
+                    x_in = torch.cat(
+                        [x_1, x_cat], dim=1
+                    )  # (batch_size, embedding_dim + cat_embedding_dim)
                 else:
-                    x_in = torch.cat([x_1] + x_cat, dim=1) # direct concat without averaging, output shape is (batch_size, embedding_dim + sum(cat_embedding_dims))
-            
-            else: # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
+                    x_in = torch.cat(
+                        [x_1] + x_cat, dim=1
+                    )  # direct concat without averaging, output shape is (batch_size, embedding_dim + sum(cat_embedding_dims))
+
+            else:  # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
                 x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
 
         else:
@@ -224,7 +236,6 @@ class FastTextModel(nn.Module):
 
         x = padded_batch
 
-        
         if not self.no_cat_var:
             other_features = []
             for i, categorical_variable in enumerate(categorical_variables):
