@@ -84,6 +84,15 @@ class FastTextModel(nn.Module):
         )
 
         self.categorical_embedding_layers = {}
+
+        # Entry dim for the last layer:
+        #   1. embedding_dim if no categorical variables or summing the categrical embeddings to sentence embedding
+        #   2. embedding_dim + cat_embedding_dim if averaging the categorical embeddings before concatenating to sentence embedding (categorical_embedding_dims is a int)
+        #   3. embedding_dim + sum(categorical_embedding_dims) if concatenating individually the categorical embeddings to sentence embedding (no averaging, categorical_embedding_dims is a list)
+        dim_in_last_layer = embedding_dim
+        if self.average_cat_embed:
+            dim_in_last_layer += categorical_embedding_dims[0]
+
         if categorical_vocabulary_sizes is not None:
             self.no_cat_var = False
             for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
@@ -91,6 +100,8 @@ class FastTextModel(nn.Module):
                     emb = nn.Embedding(
                         embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=vocab_size
                     )  # concatenate to sentence embedding
+                    if not self.average_cat_embed:
+                        dim_in_last_layer += categorical_embedding_dims[var_idx]
                 else:
                     emb = nn.Embedding(
                         embedding_dim=embedding_dim, num_embeddings=vocab_size
@@ -100,7 +111,7 @@ class FastTextModel(nn.Module):
         else:
             self.no_cat_var = True
 
-        self.fc = nn.Linear(embedding_dim, num_classes)
+        self.fc = nn.Linear(dim_in_last_layer, num_classes)
 
     def forward(self, encoded_text, additional_inputs) -> torch.Tensor:
         """

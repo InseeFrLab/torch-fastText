@@ -1,6 +1,7 @@
 """
 Utility functions.
 """
+
 import warnings
 import difflib
 from difflib import SequenceMatcher
@@ -128,15 +129,17 @@ def match_word_to_token_indexes(sentence, tokenized_sentence_tokens, min_n):
             word,
             tokenized_sentence_tokens[pointer_token],
             tokenized_sentence_tokens[pointer_token + 1],
-            min_n=min_n
+            min_n=min_n,
         ):
             pointer_token += 1
-            if pointer_token == len(tokenized_sentence_tokens)-1:
+            if pointer_token == len(tokenized_sentence_tokens) - 1:
                 warnings.warn("Error in the tokenization of the sentence")
                 # workaround to avoid error: each word is asociated to regular ranges
                 chunck = len(tokenized_sentence_tokens) // len(processed_words)
                 for idx, word in enumerate(processed_words):
-                    res[word] = range(idx * chunck, min((idx + 1) * chunck, len(tokenized_sentence_tokens)))
+                    res[word] = range(
+                        idx * chunck, min((idx + 1) * chunck, len(tokenized_sentence_tokens))
+                    )
                 return res
 
         pointer_token += 1
@@ -334,7 +337,7 @@ def explain_continuous(
 
                 for pos, token in enumerate(original_to_token[original_word]):
                     pos_token = original_to_token_idxs[original_word][pos]
-                    #tok = preprocess_token(token)[0]
+                    # tok = preprocess_token(token)[0]
                     tok = preprocess_token(token)
                     score_token = all_attr[idx, k, pos_token].item()
 

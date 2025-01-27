@@ -18,7 +18,7 @@ from .datasets.dataset import FastTextModelDataset
 from .datasets.tokenizer import NGramTokenizer
 from .model.pytorch_model import FastTextModel
 from .model.lightning_module import FastTextModule
-from .utilities.checkers import check_X, check_Y
+from .utilities.checkers import check_X, check_Y, NumpyJSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,40 @@ logging.basicConfig(
 
 @dataclass
 class torchFastText:
+    """
+    The main class for the torchFastText model.
+
+    Args for init:
+        Architecture-related:
+            Text-embedding matrix:
+                num_buckets (int): Number of rows in the embedding matrix (without counting the word-rows)
+                embedding_dim (int): Dimension of the embedding matrix
+                sparse (bool): Whether the embedding matrix is sparse
+            Categorical variables, if any:
+                categorical_vocabulary_sizes (List[int]): List of the number of unique values for each categorical variable.
+                    - Do not provide if no categorical variables
+                    - Do not provide if you want this to be inferred from X_train in the build method
+                categorical_embedding_dims (Union[List[int], int]): List of the embedding dimensions for each categorical variable.
+                    - Do not provide if no categorical variables
+                    - Do not provide if there are and the embeddings should be summed to the sentence embedding
+                    - Provide an int if all embeddings should be of the same dimension, averaged and concatened to the sentence embedding
+                    - Provide a list of int if each embedding should be of a different dimension, concatenated without aggregation to the sentence embedding
+                num_categorical_features (int): Number of categorical variables.
+                    - Not required, should match the length of the above mentioned lists
+                    - Especially useful when you do not provide vocabulary sizes and an int as categorical_embedding_dims
+
+            Tokenizer-related:
+                min_count (int): Minimum number of times a word has to be in the training data to be given an embedding.
+                min_n (int): Minimum length of character n-grams.
+                max_n (int): Maximum length of character n-grams.
+                len_word_ngrams (int): Maximum length of word n-grams.
+
+        Other attributes, not exposed during initialization:
+            tokenizer (NGramTokenizer): Tokenizer object, see build_from_tokenizer
+
+
+    """
+
     # Required parameters
 
     # Embedding matrix
@@ -173,13 +207,13 @@ class torchFastText:
         )
 
     @classmethod
-    def from_tokenizer(
+    def build_from_tokenizer(
         cls: Type["TorchFastText"],
         tokenizer: NGramTokenizer,
         embedding_dim: int,
-        sparse: bool,
-        num_classes: Optional[int] = None,
-        categorical_vocabulary_sizes: Optional[List[int]] = None,
+        num_classes: Optional[int],
+        categorical_vocabulary_sizes: Optional[List[int]],
+        sparse: bool = False,
         categorical_embedding_dims: Optional[Union[List[int], int]] = None,
         num_categorical_features: Optional[int] = None,
         lightning=True,
@@ -205,16 +239,16 @@ class torchFastText:
         # Ensure the tokenizer has the required attributes
         if not all(
             hasattr(tokenizer, attr)
-            for attr in ["min_count", "min_n", "max_n", "num_buckets", "len_word_ngrams"]
+            for attr in ["min_count", "min_n", "max_n", "num_buckets", "word_ngrams"]
         ):
-            raise ValueError("The tokenizer must provide 'min_n' and 'max_n' attributes.")
+            raise ValueError(f" Attr missing in tokenizer: {tokenizer}")
 
         # Extract attributes from the tokenizer
         min_count = tokenizer.min_count
         min_n = tokenizer.min_n
         max_n = tokenizer.max_n
         num_buckets = tokenizer.num_buckets
-        len_word_ngrams = tokenizer.len_word_ngrams
+        len_word_ngrams = tokenizer.word_ngrams
 
         wrapper = cls(
             num_buckets=num_buckets,
@@ -287,10 +321,6 @@ class torchFastText:
 
         if y_train is not None:
             if self.num_classes is not None:
-                logger.warning(
-                    "num_classes was provided at initialization. It will be overwritten by the number of unique classes in y_train."
-                )
-
                 if self.num_classes != len(np.unique(y_train)):
                     logger.warning(
                         f"Old num_classes value is {self.num_classes}. New num_classes value is {len(np.unique(y_train))}."
@@ -335,6 +365,7 @@ class torchFastText:
                 )
                 self.num_categorical_features = None
 
+        self._validate_categorical_inputs()
         self.build_tokenizer(training_text)
         self._build_pytorch_model()
 
@@ -720,10 +751,12 @@ class torchFastText:
             data.pop("pytorch_model", None)
             data.pop("lightning_module", None)
 
-            json.dump(data, f, indent=4)
+            data.pop("trained", None)  # Useless to save
+
+            json.dump(data, f, cls=NumpyJSONEncoder, indent=4)
 
     @classmethod
-    def from_json(cls: Type["TorchFastText"], filepath: str) -> "torchFastText":
+    def from_json(cls: Type["torchFastText"], filepath: str) -> "torchFastText":
         """
         Load a dataclass instance from a JSON file.
         """

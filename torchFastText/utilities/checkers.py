@@ -1,4 +1,5 @@
 import logging
+import json
 
 import numpy as np
 
@@ -6,9 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 def check_X(X):
-    assert isinstance(
-        X, np.ndarray
-    ), "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
+    assert isinstance(X, np.ndarray), (
+        "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
+    )
 
     try:
         if X.ndim > 1:
@@ -28,7 +29,7 @@ def check_X(X):
             categorical_variables = X[:, 1:].astype(int)
         except ValueError:
             logger.error(
-                f"Columns {1} to {X.shape[1]-1} of X_train must be castable in integer format."
+                f"Columns {1} to {X.shape[1] - 1} of X_train must be castable in integer format."
             )
     else:
         categorical_variables = None
@@ -38,9 +39,9 @@ def check_X(X):
 
 def check_Y(Y):
     assert isinstance(Y, np.ndarray), "Y must be a numpy array of shape (N,) or (N,1)."
-    assert len(Y.shape) == 1 or (
-        len(Y.shape) == 2 and Y.shape[1] == 1
-    ), "Y must be a numpy array of shape (N,) or (N,1)."
+    assert len(Y.shape) == 1 or (len(Y.shape) == 2 and Y.shape[1] == 1), (
+        "Y must be a numpy array of shape (N,) or (N,1)."
+    )
 
     try:
         Y = Y.astype(int)
@@ -48,3 +49,14 @@ def check_Y(Y):
         logger.error("Y must be castable in integer format.")
 
     return Y
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
