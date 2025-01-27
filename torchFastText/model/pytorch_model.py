@@ -137,7 +137,6 @@ class FastTextModel(nn.Module):
                 x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
 
         if len(x_cat) > 0:  # if there are categorical variables
-
             if self.categorical_embedding_dims is not None: # concatenate to sentence embedding
                 if self.average_cat_embed: # unique cat_embedding_dim for all categorical variables
                     x_cat = torch.stack(x_cat, dim=0).mean(dim=0) # average over all the categorical variables, output shape is (batch_size, cat_embedding_dim)

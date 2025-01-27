@@ -1,6 +1,8 @@
 import logging
 import time
-from typing import Optional, Union
+import json
+from typing import Optional, Union, Type, List
+from dataclasses import dataclass, field, asdict
 
 import numpy as np
 import pytorch_lightning as pl
@@ -14,8 +16,8 @@ from torch.optim import SGD, Adam
 
 from .datasets.dataset import FastTextModelDataset
 from .datasets.tokenizer import NGramTokenizer
-from .model.lightning_module import FastTextModule
 from .model.pytorch_model import FastTextModel
+from .model.lightning_module import FastTextModule
 from .utilities.checkers import check_X, check_Y
 
 logger = logging.getLogger(__name__)
@@ -27,68 +29,183 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-
+@dataclass
 class torchFastText:
-    def __init__(
-        self,
-        num_buckets: int,
-        embedding_dim: int,
-        min_count: int,
-        min_n: int,
-        max_n: int,
-        len_word_ngrams: int,
-        sparse: bool,
-        # Optional
-        num_classes: Optional[int] = None,
-        categorical_vocabulary_sizes: Optional[list[int]] = None,
-        categorical_embedding_dims: Optional[Union[list[int], int]] = None,
-        num_categorical_features: Optional[int] = None
-    ):
+    # Required parameters
+    num_buckets: int
+    embedding_dim: int
+    min_count: int
+    min_n: int
+    max_n: int
+    len_word_ngrams: int
+    sparse: bool
 
-        self.num_buckets = num_buckets
-        self.embedding_dim = embedding_dim
-        self.min_count = min_count
-        self.min_n = min_n
-        self.max_n = max_n
-        self.len_word_ngrams = len_word_ngrams
-        self.tokenizer = None
-        self.pytorch_model = None
-        self.sparse = sparse
-        self.trained = False
+    # Optional parameters with default values
+    num_classes: Optional[int] = None
+    categorical_vocabulary_sizes: Optional[List[int]] = None
+    categorical_embedding_dims: Optional[Union[List[int], int]] = None
+    num_categorical_features: Optional[int] = None
+    
 
-        self.num_classes = num_classes
-        self.concatenate_categorical_embed = categorical_embedding_dims is not None
-        
-        if categorical_embedding_dims is not None:
+    # Internal fields (not exposed during initialization)
+    tokenizer: Optional[NGramTokenizer] = field(init=True, default=None)
+    pytorch_model: Optional[FastTextModel] = field(init=True, default=None)
+    lightning_module: Optional[FastTextModule] = field(init=True, default=None)
+    trained: bool = field(init=False, default=False)
 
-            if categorical_vocabulary_sizes is not None:
-                assert isinstance(categorical_vocabulary_sizes, list), "categorical_vocabulary_sizes must be a list of int."
-                if isinstance(categorical_embedding_dims, list)
-                    assert len(categorical_vocabulary_sizes) == len(categorical_embedding_dims), "Categorical vocabulary sizes and their embedding dimensions must have the same length."
+    def __post_init__(self):
+        self._validate_categorical_inputs()       
+    
+    def _validate_categorical_inputs(self):
+        if self.categorical_embedding_dims is None:
+            return
 
-                if num_categorical_features is not None:
-                    assert len(categorical_vocabulary_sizes) == num_categorical_features, "len(categorical_vocabulary_sizes) must be equal to num_categorical_features."
-                else:
-                    num_categorical_features = len(categorical_vocabulary_sizes)
-            else:
-                logger.warning("categorical_embedding_dims provided but not categorical_vocabulary_sizes: the latter will be inferred from X_train when build function will be called.")
+        if self.categorical_vocabulary_sizes is not None:
+            if not isinstance(self.categorical_vocabulary_sizes, list):
+                raise TypeError("categorical_vocabulary_sizes must be a list of int")
             
-            if num_categorical_features is not None:
-                self.num_categorical_features = num_categorical_features
-                if isinstance(categorical_embedding_dims, int): # int or list
-                    categorical_embedding_dims = [categorical_embedding_dims] * num_categorical_features # if int, it will be repeated for all the categorical features
-                else: # if list, check length
-                    assert isinstance(categorical_embedding_dims, list), "categorical_embedding_dims must be an int or a list of int."
-                    assert len(categorical_embedding_dims) == num_categorical_features, f"len(categorical_embedding_dims)({len(categorical_embedding_dims)}) should be equal to num_categorical_features( {num_categorical_features})."
-
+            if isinstance(self.categorical_embedding_dims, list):
+                if len(self.categorical_vocabulary_sizes) != len(self.categorical_embedding_dims):
+                    raise ValueError("Categorical vocabulary sizes and their embedding dimensions must have the same length")
+            
+            if self.num_categorical_features is not None:
+                if len(self.categorical_vocabulary_sizes) != self.num_categorical_features:
+                    raise ValueError("len(categorical_vocabulary_sizes) must be equal to num_categorical_features")
             else:
-                if isinstance(categorical_embedding_dims, list): # int or list
-                    self.num_categorical_features = len(categorical_embedding_dims)
-                else: # int
-                    assert isinstance(categorical_embedding_dims, int), "categorical_embedding_dims must be an int or a list of int."
-                    logger.warning("categorical_embedding_dims provided as int but not num_categorical_features: the latter will be inferred from X_train when build function will be called and all the categorical variables will have the same embedding dimension.")
-                    self.num_categorical_features = None
-        
+                self.num_categorical_features = len(self.categorical_vocabulary_sizes)
+        else:
+            logger.warning("categorical_embedding_dims provided but not categorical_vocabulary_sizes. It will be inferred later")
+
+        if self.num_categorical_features is not None:
+            if isinstance(self.categorical_embedding_dims, int):
+                self.categorical_embedding_dims = [self.categorical_embedding_dims] * self.num_categorical_features
+            elif not isinstance(self.categorical_embedding_dims, list):
+                raise TypeError("categorical_embedding_dims must be an int or a list of int")
+            elif len(self.categorical_embedding_dims) != self.num_categorical_features:
+                raise ValueError(
+                    f"len(categorical_embedding_dims)({len(self.categorical_embedding_dims)}) "
+                    f"should be equal to num_categorical_features({self.num_categorical_features})"
+                )
+        elif isinstance(self.categorical_embedding_dims, list):
+            self.num_categorical_features = len(self.categorical_embedding_dims)
+        else:
+            logger.warning("categorical_embedding_dims provided as int but not num_categorical_features. It will be inferred later")
+
+    def _check_and_init_lightning(self, optimizer=None, optimizer_params=None, lr=None,
+                                scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau,
+                                patience_scheduler=3,
+                                loss=torch.nn.CrossEntropyLoss()):
+        if optimizer is None:
+            if lr is None:
+                raise ValueError("Please provide a learning rate")
+            self.optimizer = SGD if self.sparse else Adam
+            self.optimizer_params = {"lr": lr}
+        else:
+            self.optimizer = optimizer
+            if optimizer_params is None:
+                logger.warning("No optimizer parameters provided. Using default parameters")
+                self.optimizer_params = {}
+
+        self.scheduler = scheduler
+        self.scheduler_params = {
+            "mode": "min",
+            "patience": patience_scheduler,
+        }
+        self.loss = loss
+
+        self.lightning_module = FastTextModule(
+            model=self.pytorch_model,
+            loss=self.loss,
+            optimizer=self.optimizer,
+            optimizer_params=self.optimizer_params,
+            scheduler=self.scheduler,
+            scheduler_params=self.scheduler_params,
+            scheduler_interval="epoch",
+        )
+    
+    def _build_pytorch_model(self):
+        self.pytorch_model = FastTextModel(
+            tokenizer=self.tokenizer,
+            embedding_dim=self.embedding_dim,
+            vocab_size=self.num_buckets + self.tokenizer.get_nwords() + 1,
+            num_classes=self.num_classes,
+            categorical_vocabulary_sizes=self.categorical_vocabulary_sizes,
+            categorical_embedding_dims=self.categorical_embedding_dims,
+            padding_idx=self.num_buckets + self.tokenizer.get_nwords(),
+            sparse=self.sparse,
+            direct_bagging=True,
+        )
+
+
+    @classmethod
+    def from_tokenizer(
+        cls: Type["TorchFastText"],
+        tokenizer: NGramTokenizer,
+        embedding_dim: int,
+        sparse: bool,
+        num_classes: Optional[int] = None,
+        categorical_vocabulary_sizes: Optional[List[int]] = None,
+        categorical_embedding_dims: Optional[Union[List[int], int]] = None,
+        num_categorical_features: Optional[int] = None,
+        lightning=True,
+        optimizer=None,
+        optimizer_params=None,
+        lr=None,
+        scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau,
+        patience_scheduler=3,
+        loss=torch.nn.CrossEntropyLoss(),
+        ) -> "torchFastText":
+            """
+            Alternative constructor that initializes torchFastText from a tokenizer.
+
+            Args:
+                tokenizer: A NGramTokenizer object that provides min_n, max_n, and other variables.
+                embedding_dim: Dimension of word embeddings.
+                sparse: Whether to use sparse embeddings.
+                num_classes: Number of output classes (optional).
+                categorical_vocabulary_sizes: List of vocabulary sizes for categorical features (optional).
+                categorical_embedding_dims: Embedding dimensions for categorical features (optional).
+                num_categorical_features: Number of categorical features (optional).
+
+            Returns:
+                torchFastText: An instance of TorchFastText initialized using the tokenizer.
+            """
+            # Ensure the tokenizer has the required attributes
+            if not all(hasattr(tokenizer, attr) for attr in ["min_count", "min_n", "max_n", "num_buckets", "len_word_ngrams"]):
+                raise ValueError("The tokenizer must provide 'min_n' and 'max_n' attributes.")
+
+            # Extract attributes from the tokenizer
+            min_count = tokenizer.min_count
+            min_n = tokenizer.min_n
+            max_n = tokenizer.max_n
+            num_buckets = tokenizer.num_buckets
+            len_word_ngrams = tokenizer.len_word_ngrams
+
+            wrapper = cls(
+                num_buckets=num_buckets,
+                embedding_dim=embedding_dim,
+                min_count=min_count,
+                min_n=min_n,
+                max_n=max_n,
+                len_word_ngrams=len_word_ngrams,
+                sparse=sparse,
+                num_classes=num_classes,
+                categorical_vocabulary_sizes=categorical_vocabulary_sizes,
+                categorical_embedding_dims=categorical_embedding_dims,
+                num_categorical_features=num_categorical_features,
+                tokenizer=tokenizer,
+            )
+
+            wrapper._build_pytorch_model()
+
+            if lightning:
+                wrapper._check_and_init_lightning(optimizer=optimizer,
+                                                  optimizer_params=optimizer_params,
+                                                  lr=lr,
+                                                  scheduler=scheduler,
+                                                  patience_scheduler=patience_scheduler,
+                                                  loss=loss)
+            return wrapper
 
     def build_tokenizer(self, training_text):
         self.tokenizer = NGramTokenizer(
@@ -128,54 +245,44 @@ class torchFastText:
             )  # Be sure that y_train contains all the classes !
 
         if not no_cat_var:
+
+            if self.num_categorical_features is not None:
+                if self.num_categorical_features != categorical_variables.shape[1]:
+                    logger.warning(f"num_categorical_features: old value is {self.num_categorical_features}. New value is {categorical_variables.shape[1]}.")
+
             self.num_categorical_features = categorical_variables.shape[1]
+
             categorical_vocabulary_sizes = np.max(categorical_variables, axis=0) + 1
+
+            if self.categorical_vocabulary_sizes is not None:
+                if self.categorical_vocabulary_sizes != list(categorical_vocabulary_sizes):
+                    logger.warning(
+                        "categorical_vocabulary_sizes was provided at initialization. It will be overwritten by the unique values in the training data."
+                    )
+            self.categorical_vocabulary_sizes = list(categorical_vocabulary_sizes)
         else:
-            categorical_vocabulary_sizes = None
+            if categorical_vocabulary_sizes is not None:
+                logger.warning(
+                    "categorical_vocabulary_sizes was provided at initialization but no categorical variables are provided in X_train. Updating to None."
+                )
+                self.categorical_vocabulary_sizes = None
+            if self.num_categorical_features is not None:
+                logger.warning(
+                    "num_categorical_features was provided at initialization but no categorical variables are provided in X_train. Updating to None."
+                )
+                self.num_categorical_features = None
 
         self.build_tokenizer(training_text)
-        self.pytorch_model = FastTextModel(
-            tokenizer=self.tokenizer,
-            embedding_dim=self.embedding_dim,
-            vocab_size=self.num_buckets + self.tokenizer.get_nwords() + 1,
-            num_classes=self.num_classes,
-            categorical_vocabulary_sizes=categorical_vocabulary_sizes,
-            padding_idx=self.num_buckets + self.tokenizer.get_nwords(),
-            sparse=self.sparse,
-            direct_bagging=True,
-        )
+        self._build_pytorch_model()
 
         if lightning:
-            # Optimizer, scheduler and loss
-            if optimizer is None:
-                assert lr is not None, "Please provide a learning rate."
-                if not self.sparse:
-                    self.optimizer = Adam
-                else:
-                    self.optimizer = SGD
-                self.optimizer_params = {"lr": lr}
-            else:
-                self.optimizer = optimizer
-                if self.optimizer_params is None:
-                    logger.warning("No optimizer parameters provided. Using default parameters.")
+            self._check_and_init_lightning(optimizer=optimizer,
+                                            optimizer_params=optimizer_params,
+                                            lr=lr,
+                                            scheduler=scheduler,
+                                            patience_scheduler=patience_scheduler,
+                                            loss=loss)
 
-            self.scheduler = scheduler
-            self.scheduler_params = {
-                "mode": "min",
-                "patience": patience_scheduler,
-            }
-            self.loss = loss
-
-            # Lightning Module
-            self.lightning_module = FastTextModule(
-                model=self.pytorch_model,
-                loss=self.loss,
-                optimizer=self.optimizer,
-                optimizer_params=self.optimizer_params,
-                scheduler=self.scheduler,
-                scheduler_params=self.scheduler_params,
-                scheduler_interval="epoch",
-            )
 
     def build_data_loaders(self, X_train, y_train, X_val, y_val, batch_size, num_workers):
         """
@@ -538,6 +645,27 @@ class torchFastText:
             assert self.pytorch_model.no_cat_var == True
 
         return self.pytorch_model.predict_and_explain(text, categorical_variables, top_k=top_k)
+
+    
+    def to_json(self, filepath: str) -> None:
+        with open(filepath, 'w') as f:
+            data = asdict(self)
+
+            # Exclude non-serializable fields
+            data.pop('tokenizer', None)
+            data.pop('pytorch_model', None)
+            data.pop('lightning_module', None)
+            
+            json.dump(data, f, indent=4)
+
+    @classmethod
+    def from_json(cls: Type["TorchFastText"], filepath: str) -> "torchFastText":
+        """
+        Load a dataclass instance from a JSON file.
+        """
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        return cls(**data)
 
     def quantize():
         # TODO
