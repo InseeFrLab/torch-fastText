@@ -1,0 +1,27 @@
+{
+    "num_buckets": 100000,
+    "embedding_dim": 50,
+    "sparse": false,
+    "min_count": 1,
+    "min_n": 3,
+    "max_n": 6,
+    "len_word_ngrams": 3,
+    "num_classes": 732,
+    "categorical_vocabulary_sizes": [
+        21,
+        26,
+        8,
+        12,
+        3,
+        4
+    ],
+    "categorical_embedding_dims": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+    ],
+    "num_categorical_features": 6
+}

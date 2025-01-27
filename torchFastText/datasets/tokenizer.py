@@ -3,7 +3,8 @@ NGramTokenizer class.
 """
 
 import ctypes
-from typing import List, Tuple
+import json
+from typing import List, Tuple, Type
 
 import numpy as np
 import torch
@@ -22,9 +23,10 @@ class NGramTokenizer:
         min_count: int,
         min_n: int,
         max_n: int,
-        buckets: int,
-        word_ngrams: int,
+        num_buckets: int,
+        len_word_ngrams: int,
         training_text: List[str],
+        **kwargs,
     ):
         """
         Constructor for the NGramTokenizer class.
@@ -34,7 +36,7 @@ class NGramTokenizer:
                 in the training data to be given an embedding.
             min_n (int): Minimum length of character n-grams.
             max_n (int): Maximum length of character n-grams.
-            buckets (int): Number of rows in the embedding matrix.
+            num_buckets (int): Number of rows in the embedding matrix.
             word_ngrams (int): Maximum length of word n-grams.
             training_text (List[str]): List of training texts.
 
@@ -46,10 +48,12 @@ class NGramTokenizer:
             raise ValueError("`min_n` parameter must be greater than 1.")
         if max_n > 6:
             raise ValueError("`max_n` parameter must be smaller than 7.")
+
+        self.min_count = min_count
         self.min_n = min_n
         self.max_n = max_n
-        self.num_buckets = buckets
-        self.word_ngrams = word_ngrams
+        self.num_buckets = num_buckets
+        self.word_ngrams = len_word_ngrams
 
         word_counts = {}
         for sentence in training_text:
@@ -271,3 +275,12 @@ class NGramTokenizer:
 
     def get_vocab(self):
         return self.word_id_mapping
+
+    @classmethod
+    def from_json(cls: Type["NGramTokenizer"], filepath: str, training_text) -> "NGramTokenizer":
+        """
+        Load a dataclass instance from a JSON file.
+        """
+        with open(filepath, "r") as f:
+            data = json.load(f)
+        return cls(**data, training_text=training_text)
