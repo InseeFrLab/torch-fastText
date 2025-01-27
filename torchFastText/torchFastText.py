@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Optional, Union
 
 import numpy as np
 import pytorch_lightning as pl
@@ -30,14 +31,20 @@ logging.basicConfig(
 class torchFastText:
     def __init__(
         self,
-        num_buckets,
-        embedding_dim,
-        min_count,
-        min_n,
-        max_n,
-        len_word_ngrams,
-        sparse,
+        num_buckets: int,
+        embedding_dim: int,
+        min_count: int,
+        min_n: int,
+        max_n: int,
+        len_word_ngrams: int,
+        sparse: bool,
+        # Optional
+        num_classes: Optional[int] = None,
+        categorical_vocabulary_sizes: Optional[list[int]] = None,
+        categorical_embedding_dims: Optional[Union[list[int], int]] = None,
+        num_categorical_features: Optional[int] = None
     ):
+
         self.num_buckets = num_buckets
         self.embedding_dim = embedding_dim
         self.min_count = min_count
@@ -48,8 +55,40 @@ class torchFastText:
         self.pytorch_model = None
         self.sparse = sparse
         self.trained = False
-        self.num_categorical_features = None
-        self.num_classes = None
+
+        self.num_classes = num_classes
+        self.concatenate_categorical_embed = categorical_embedding_dims is not None
+        
+        if categorical_embedding_dims is not None:
+
+            if categorical_vocabulary_sizes is not None:
+                assert isinstance(categorical_vocabulary_sizes, list), "categorical_vocabulary_sizes must be a list of int."
+                if isinstance(categorical_embedding_dims, list)
+                    assert len(categorical_vocabulary_sizes) == len(categorical_embedding_dims), "Categorical vocabulary sizes and their embedding dimensions must have the same length."
+
+                if num_categorical_features is not None:
+                    assert len(categorical_vocabulary_sizes) == num_categorical_features, "len(categorical_vocabulary_sizes) must be equal to num_categorical_features."
+                else:
+                    num_categorical_features = len(categorical_vocabulary_sizes)
+            else:
+                logger.warning("categorical_embedding_dims provided but not categorical_vocabulary_sizes: the latter will be inferred from X_train when build function will be called.")
+            
+            if num_categorical_features is not None:
+                self.num_categorical_features = num_categorical_features
+                if isinstance(categorical_embedding_dims, int): # int or list
+                    categorical_embedding_dims = [categorical_embedding_dims] * num_categorical_features # if int, it will be repeated for all the categorical features
+                else: # if list, check length
+                    assert isinstance(categorical_embedding_dims, list), "categorical_embedding_dims must be an int or a list of int."
+                    assert len(categorical_embedding_dims) == num_categorical_features, f"len(categorical_embedding_dims)({len(categorical_embedding_dims)}) should be equal to num_categorical_features( {num_categorical_features})."
+
+            else:
+                if isinstance(categorical_embedding_dims, list): # int or list
+                    self.num_categorical_features = len(categorical_embedding_dims)
+                else: # int
+                    assert isinstance(categorical_embedding_dims, int), "categorical_embedding_dims must be an int or a list of int."
+                    logger.warning("categorical_embedding_dims provided as int but not num_categorical_features: the latter will be inferred from X_train when build function will be called and all the categorical variables will have the same embedding dimension.")
+                    self.num_categorical_features = None
+        
 
     def build_tokenizer(self, training_text):
         self.tokenizer = NGramTokenizer(
@@ -64,7 +103,7 @@ class torchFastText:
     def build(
         self,
         X_train,
-        y_train,
+        y_train=None,
         lightning=True,
         optimizer=None,
         optimizer_params=None,
@@ -74,10 +113,19 @@ class torchFastText:
         loss=torch.nn.CrossEntropyLoss(),
     ):
         training_text, categorical_variables, no_cat_var = check_X(X_train)
-        y_train = check_Y(y_train)
-        self.num_classes = len(
-            np.unique(y_train)
-        )  # Be sure that y_train contains all the classes !
+
+        if y_train is not None:
+            if self.num_classes is not None:
+                logger.warning(
+                    "num_classes was provided at initialization. It will be overwritten by the number of unique classes in y_train.")
+                
+                if self.num_classes != len(np.unique(y_train)):
+                    logger.warning(f"Old num_classes value is {self.num_classes}. New num_classes value is {len(np.unique(y_train))}.")
+
+            y_train = check_Y(y_train)
+            self.num_classes = len(
+                np.unique(y_train)
+            )  # Be sure that y_train contains all the classes !
 
         if not no_cat_var:
             self.num_categorical_features = categorical_variables.shape[1]

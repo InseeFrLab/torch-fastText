@@ -36,6 +36,7 @@ class FastTextModel(nn.Module):
         vocab_size: int,
         num_classes: int,
         categorical_vocabulary_sizes: List[int] = None,
+        categorical_embedding_dims: List[int] = None,
         padding_idx: int = 0,
         sparse: bool = True,
         direct_bagging: bool = False,
@@ -62,6 +63,14 @@ class FastTextModel(nn.Module):
         self.direct_bagging = direct_bagging
         self.vocab_size = vocab_size
         self.sparse = sparse
+        
+
+        if categorical_embedding_dims is not None:
+            self.categorical_embedding_dims = categorical_embedding_dims
+
+            if len(set(categorical_embedding_dims)) == 1:
+                self.average_cat_embed = True # if categorical embedding dims are the same, we average them before concatenating to the sentence embedding
+
 
         self.embeddings = (
             nn.Embedding(
@@ -76,12 +85,15 @@ class FastTextModel(nn.Module):
             )
         )
 
-        self.categorical_embeddings = {}
+        self.categorical_embedding_layers = {}
         if categorical_vocabulary_sizes is not None:
             self.no_cat_var = False
             for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
-                emb = nn.Embedding(embedding_dim=embedding_dim, num_embeddings=vocab_size)
-                self.categorical_embeddings[var_idx] = emb
+                if categorical_embedding_dims is not None:
+                    emb = nn.Embedding(embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=vocab_size) # concatenate to sentence embedding
+                else:
+                    emb = nn.Embedding(embedding_dim=embedding_dim, num_embeddings=vocab_size) # sum to sentence embedding
+                self.categorical_embedding_layers[var_idx] = emb
                 setattr(self, "emb_{}".format(var_idx), emb)
         else:
             self.no_cat_var = True
@@ -121,17 +133,24 @@ class FastTextModel(nn.Module):
         # Embed categorical variables
         x_cat = []
         if not self.no_cat_var:
-            for i, (variable, embedding_layer) in enumerate(self.categorical_embeddings.items()):
+            for i, (variable, embedding_layer) in enumerate(self.categorical_embedding_layers.items()):
                 x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
 
         if len(x_cat) > 0:  # if there are categorical variables
-            # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
-            x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
+
+            if self.categorical_embedding_dims is not None: # concatenate to sentence embedding
+                if self.average_cat_embed: # unique cat_embedding_dim for all categorical variables
+                    x_cat = torch.stack(x_cat, dim=0).mean(dim=0) # average over all the categorical variables, output shape is (batch_size, cat_embedding_dim)
+                    x_in = torch.cat([x_1, x_cat], dim=1)  # (batch_size, embedding_dim + cat_embedding_dim)
+                else:
+                    x_in = torch.cat([x_1] + x_cat, dim=1) # direct concat without averaging, output shape is (batch_size, embedding_dim + sum(cat_embedding_dims))
+            
+            else: # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
+                x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
 
         else:
             x_in = x_1
 
-        # Linear layer
         z = self.fc(x_in)  # (batch_size, num_classes)
         return z
 
