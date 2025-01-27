@@ -107,8 +107,7 @@ class torchFastText:
             logger.warning(
                 "categorical_embedding_dims provided as int but not num_categorical_features. It will be inferred later"
             )
-    
-    
+
     def _build_pytorch_model(self):
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
@@ -151,7 +150,9 @@ class torchFastText:
         self.scheduler = scheduler
 
         if scheduler_params is None:
-            logger.warning("No scheduler parameters provided. Using default parameters (suited for ReduceLROnPlateau).")
+            logger.warning(
+                "No scheduler parameters provided. Using default parameters (suited for ReduceLROnPlateau)."
+            )
             self.scheduler_params = {
                 "mode": "min",
                 "patience": patience_scheduler,
@@ -267,7 +268,6 @@ class torchFastText:
         patience_scheduler=3,
         loss=torch.nn.CrossEntropyLoss(),
     ):
-
         """
         Public method that acts as a wrapper to build model, inferring from training data if necessary.
 
@@ -302,7 +302,9 @@ class torchFastText:
             )  # Be sure that y_train contains all the classes !
         else:
             if self.num_classes is None:
-                raise ValueError("Either num_classes must be provided at init or y_train must be provided here.")
+                raise ValueError(
+                    "Either num_classes must be provided at init or y_train must be provided here."
+                )
 
         if not no_cat_var:
             if self.num_categorical_features is not None:
