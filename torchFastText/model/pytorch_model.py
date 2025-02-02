@@ -31,10 +31,10 @@ class FastTextModel(nn.Module):
 
     def __init__(
         self,
-        tokenizer,
         embedding_dim: int,
-        vocab_size: int,
         num_classes: int,
+        tokenizer=None,
+        num_tokens: int = None,
         categorical_vocabulary_sizes: List[int] = None,
         categorical_embedding_dims: List[int] = None,
         padding_idx: int = 0,
@@ -56,12 +56,22 @@ class FastTextModel(nn.Module):
             direct_bagging (bool): Use EmbeddingBag instead of Embedding for the text embedding.
         """
         super(FastTextModel, self).__init__()
+
+        if tokenizer is None:
+            if num_tokens is None:
+                raise ValueError("Either tokenizer or num_tokens must be provided (number of rows in the embedding matrix).")
+            self.num_tokens = num_tokens
+        else:
+            if num_tokens is not None:
+                if num_tokens != tokenizer.num_tokens:
+                    raise ValueError("The num_tokens must be the same as the tokenizer's.")
+            self.num_tokens = tokenizer.num_tokens
+
         self.num_classes = num_classes
         self.padding_idx = padding_idx
         self.tokenizer = tokenizer
         self.embedding_dim = embedding_dim
         self.direct_bagging = direct_bagging
-        self.vocab_size = vocab_size
         self.sparse = sparse
 
         if categorical_embedding_dims is not None:
@@ -73,13 +83,13 @@ class FastTextModel(nn.Module):
         self.embeddings = (
             nn.Embedding(
                 embedding_dim=embedding_dim,
-                num_embeddings=vocab_size,
+                num_embeddings=num_tokens,
                 padding_idx=padding_idx,
                 sparse=sparse,
             )
             if not direct_bagging
             else nn.EmbeddingBag(
-                embedding_dim=embedding_dim, num_embeddings=vocab_size, sparse=sparse, mode="mean"
+                embedding_dim=embedding_dim, num_embeddings=num_tokens, sparse=sparse, mode="mean"
             )
         )
 
@@ -95,16 +105,16 @@ class FastTextModel(nn.Module):
 
         if categorical_vocabulary_sizes is not None:
             self.no_cat_var = False
-            for var_idx, vocab_size in enumerate(categorical_vocabulary_sizes):
+            for var_idx, num_tokens in enumerate(categorical_vocabulary_sizes):
                 if categorical_embedding_dims is not None:
                     emb = nn.Embedding(
-                        embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=vocab_size
+                        embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=num_tokens
                     )  # concatenate to sentence embedding
                     if not self.average_cat_embed:
                         dim_in_last_layer += categorical_embedding_dims[var_idx]
                 else:
                     emb = nn.Embedding(
-                        embedding_dim=embedding_dim, num_embeddings=vocab_size
+                        embedding_dim=embedding_dim, num_embeddings=num_tokens
                     )  # sum to sentence embedding
                 self.categorical_embedding_layers[var_idx] = emb
                 setattr(self, "emb_{}".format(var_idx), emb)
@@ -211,7 +221,7 @@ class FastTextModel(nn.Module):
                 # Get back the classical embedding layer for explainability
                 new_embed_layer = nn.Embedding(
                     embedding_dim=self.embedding_dim,
-                    num_embeddings=self.vocab_size,
+                    num_embeddings=self.num_tokens,
                     padding_idx=self.padding_idx,
                     sparse=self.sparse,
                 )
@@ -285,7 +295,7 @@ class FastTextModel(nn.Module):
             if flag_change_embed:
                 new_embed_layer = nn.EmbeddingBag(
                     embedding_dim=self.embedding_dim,
-                    num_embeddings=self.vocab_size,
+                    num_embeddings=self.num_tokens,
                     padding_idx=self.padding_idx,
                     sparse=self.sparse,
                 )
