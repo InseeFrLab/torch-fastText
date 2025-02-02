@@ -23,7 +23,7 @@ class NGramTokenizer:
         min_count: int,
         min_n: int,
         max_n: int,
-        num_buckets: int,
+        num_tokens: int,
         len_word_ngrams: int,
         training_text: List[str],
         **kwargs,
@@ -36,7 +36,7 @@ class NGramTokenizer:
                 in the training data to be given an embedding.
             min_n (int): Minimum length of character n-grams.
             max_n (int): Maximum length of character n-grams.
-            num_buckets (int): Number of rows in the embedding matrix.
+            num_tokens (int): Number of rows in the embedding matrix.
             word_ngrams (int): Maximum length of word n-grams.
             training_text (List[str]): List of training texts.
 
@@ -52,7 +52,7 @@ class NGramTokenizer:
         self.min_count = min_count
         self.min_n = min_n
         self.max_n = max_n
-        self.num_buckets = num_buckets
+        self.num_tokens = num_tokens
         self.word_ngrams = len_word_ngrams
 
         word_counts = {}
@@ -75,7 +75,7 @@ class NGramTokenizer:
         Returns:
             str: Description.
         """
-        return f"<NGramTokenizer(min_n={self.min_n}, max_n={self.max_n}, num_buckets={self.num_buckets}, word_ngrams={self.word_ngrams}, nwords={self.nwords})>"
+        return f"<NGramTokenizer(min_n={self.min_n}, max_n={self.max_n}, num_tokens={self.num_tokens}, word_ngrams={self.word_ngrams}, nwords={self.nwords})>"
 
     def get_nwords(self) -> int:
         """
@@ -93,7 +93,7 @@ class NGramTokenizer:
         Returns:
             int: Number of buckets.
         """
-        return self.num_buckets
+        return self.num_tokens
 
     @staticmethod
     def get_ngram_list(word: str, n: int) -> List[str]:
@@ -159,7 +159,7 @@ class NGramTokenizer:
         Returns:
             int: Index.
         """
-        return self.get_hash(subword) % self.num_buckets + self.nwords
+        return self.get_hash(subword) % self.num_tokens + self.nwords
 
     def get_word_index(self, word: str) -> int:
         """
@@ -235,7 +235,7 @@ class NGramTokenizer:
                 gram = " ".join(gram)
 
                 hashes = tuple(self.get_hash(word) for word in gram)
-                word_ngram_id = int(self.get_word_ngram_id(hashes, self.num_buckets, self.nwords))
+                word_ngram_id = int(self.get_word_ngram_id(hashes, self.num_tokens, self.nwords))
                 all_tokens_id[gram] = word_ngram_id
                 word_ngram_ids.append(word_ngram_id)
 

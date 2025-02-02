@@ -208,7 +208,7 @@ class torchFastText:
 
     @classmethod
     def build_from_tokenizer(
-        cls: Type["TorchFastText"],
+        cls: Type["torchFastText"],
         tokenizer: NGramTokenizer,
         embedding_dim: int,
         num_classes: Optional[int],
