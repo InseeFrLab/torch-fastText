@@ -18,7 +18,7 @@ from .datasets.dataset import FastTextModelDataset
 from .datasets.tokenizer import NGramTokenizer
 from .model.pytorch_model import FastTextModel
 from .model.lightning_module import FastTextModule
-from .utilities.checkers import check_X, check_Y, NumpyJSONEncoder
+from .utilities.checkers import check_X, check_Y, validate_categorical_inputs, NumpyJSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class torchFastText:
     Args for init:
         Architecture-related:
             Text-embedding matrix:
-                num_buckets (int): Number of rows in the embedding matrix (without counting the word-rows)
+                num_tokens (int): Number of rows in the embedding matrix (without counting the word-rows)
                 embedding_dim (int): Dimension of the embedding matrix
                 sparse (bool): Whether the embedding matrix is sparse
             Categorical variables, if any:
@@ -69,7 +69,7 @@ class torchFastText:
     # Required parameters
 
     # Embedding matrix
-    num_buckets: int
+    num_tokens: int
     embedding_dim: int
     sparse: bool
 
@@ -95,62 +95,17 @@ class torchFastText:
     trained: bool = field(init=False, default=False)
 
     def __post_init__(self):
-        self._validate_categorical_inputs()
-
-    def _validate_categorical_inputs(self):
-        if self.categorical_embedding_dims is None:
-            return
-
-        if self.categorical_vocabulary_sizes is not None:
-            if not isinstance(self.categorical_vocabulary_sizes, list):
-                raise TypeError("categorical_vocabulary_sizes must be a list of int")
-
-            if isinstance(self.categorical_embedding_dims, list):
-                if len(self.categorical_vocabulary_sizes) != len(self.categorical_embedding_dims):
-                    raise ValueError(
-                        "Categorical vocabulary sizes and their embedding dimensions must have the same length"
-                    )
-
-            if self.num_categorical_features is not None:
-                if len(self.categorical_vocabulary_sizes) != self.num_categorical_features:
-                    raise ValueError(
-                        "len(categorical_vocabulary_sizes) must be equal to num_categorical_features"
-                    )
-            else:
-                self.num_categorical_features = len(self.categorical_vocabulary_sizes)
-        else:
-            logger.warning(
-                "categorical_embedding_dims provided but not categorical_vocabulary_sizes. It will be inferred later"
-            )
-
-        if self.num_categorical_features is not None:
-            if isinstance(self.categorical_embedding_dims, int):
-                self.categorical_embedding_dims = [
-                    self.categorical_embedding_dims
-                ] * self.num_categorical_features
-            elif not isinstance(self.categorical_embedding_dims, list):
-                raise TypeError("categorical_embedding_dims must be an int or a list of int")
-            elif len(self.categorical_embedding_dims) != self.num_categorical_features:
-                raise ValueError(
-                    f"len(categorical_embedding_dims)({len(self.categorical_embedding_dims)}) "
-                    f"should be equal to num_categorical_features({self.num_categorical_features})"
-                )
-        elif isinstance(self.categorical_embedding_dims, list):
-            self.num_categorical_features = len(self.categorical_embedding_dims)
-        else:
-            logger.warning(
-                "categorical_embedding_dims provided as int but not num_categorical_features. It will be inferred later"
-            )
-
+        self.categorical_vocabulary_sizes, self.categorical_embedding_dims, self.num_categorical_features = validate_categorical_inputs(self.categorical_vocabulary_sizes, self.categorical_embedding_dims, self.num_categorical_features)
+            
     def _build_pytorch_model(self):
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
             embedding_dim=self.embedding_dim,
-            vocab_size=self.num_buckets + self.tokenizer.get_nwords() + 1,
+            num_tokens=self.num_tokens + self.tokenizer.get_nwords() + 1,
             num_classes=self.num_classes,
             categorical_vocabulary_sizes=self.categorical_vocabulary_sizes,
             categorical_embedding_dims=self.categorical_embedding_dims,
-            padding_idx=self.num_buckets + self.tokenizer.get_nwords(),
+            padding_idx=self.num_tokens + self.tokenizer.get_nwords(),
             sparse=self.sparse,
             direct_bagging=True,
         )
@@ -239,7 +194,7 @@ class torchFastText:
         # Ensure the tokenizer has the required attributes
         if not all(
             hasattr(tokenizer, attr)
-            for attr in ["min_count", "min_n", "max_n", "num_buckets", "word_ngrams"]
+            for attr in ["min_count", "min_n", "max_n", "num_tokens", "word_ngrams"]
         ):
             raise ValueError(f" Attr missing in tokenizer: {tokenizer}")
 
@@ -247,11 +202,11 @@ class torchFastText:
         min_count = tokenizer.min_count
         min_n = tokenizer.min_n
         max_n = tokenizer.max_n
-        num_buckets = tokenizer.num_buckets
+        num_tokens = tokenizer.num_tokens
         len_word_ngrams = tokenizer.word_ngrams
 
         wrapper = cls(
-            num_buckets=num_buckets,
+            num_tokens=num_tokens,
             embedding_dim=embedding_dim,
             min_count=min_count,
             min_n=min_n,
@@ -284,7 +239,7 @@ class torchFastText:
             self.min_count,
             self.min_n,
             self.max_n,
-            self.num_buckets,
+            self.num_tokens,
             self.len_word_ngrams,
             training_text,
         )
@@ -652,7 +607,7 @@ class torchFastText:
         self.tokenizer = self.pytorch_model.tokenizer
 
         self.sparse = self.pytorch_model.sparse
-        self.num_buckets = self.tokenizer.num_buckets
+        self.num_tokens = self.tokenizer.num_tokens
         self.embedding_dim = self.pytorch_model.embedding_dim
         self.num_classes = self.pytorch_model.num_classes
         self.min_n = self.tokenizer.min_n
