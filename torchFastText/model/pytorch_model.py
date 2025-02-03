@@ -4,6 +4,7 @@ Integrates additional categorical features.
 """
 
 from typing import List
+import logging
 
 import torch
 
@@ -22,7 +23,16 @@ from ..utilities.utils import (
     explain_continuous,
     tokenized_text_in_tokens,
 )
+from ..utilities.checkers import validate_categorical_inputs
 
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler()],
+)
 
 class FastTextModel(nn.Module):
     """
@@ -57,15 +67,17 @@ class FastTextModel(nn.Module):
         """
         super(FastTextModel, self).__init__()
 
+        categorical_vocabulary_sizes, categorical_embedding_dims, num_categorical_features = validate_categorical_inputs(categorical_vocabulary_sizes, categorical_embedding_dims,num_categorical_features=None)
+
         if tokenizer is None:
             if num_tokens is None:
                 raise ValueError("Either tokenizer or num_tokens must be provided (number of rows in the embedding matrix).")
-            self.num_tokens = num_tokens
         else:
             if num_tokens is not None:
                 if num_tokens != tokenizer.num_tokens:
-                    raise ValueError("The num_tokens must be the same as the tokenizer's.")
-            self.num_tokens = tokenizer.num_tokens
+                    logger.warning("num_tokens is different from the number of tokens in the tokenizer. Using provided num_tokens.")
+        
+        self.num_tokens = num_tokens
 
         self.num_classes = num_classes
         self.padding_idx = padding_idx

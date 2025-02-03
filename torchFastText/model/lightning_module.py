@@ -18,7 +18,8 @@ class FastTextModule(pl.LightningModule):
         optimizer_params,
         scheduler,
         scheduler_params,
-        scheduler_interval,
+        scheduler_interval="epoch",
+        **kwargs,
     ):
         """
         Initialize FastTextModule.

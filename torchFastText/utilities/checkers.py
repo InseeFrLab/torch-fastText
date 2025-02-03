@@ -1,5 +1,6 @@
 import logging
 import json
+from typing import Optional, Union, Type, List
 
 import numpy as np
 
@@ -50,6 +51,51 @@ def check_Y(Y):
 
     return Y
 
+def validate_categorical_inputs(categorical_vocabulary_sizes: List[int],
+                                categorical_embedding_dims: Union[List[int], int],
+                                num_categorical_features: int = None):
+    
+    if categorical_vocabulary_sizes is not None:
+        if not isinstance(categorical_vocabulary_sizes, list):
+            raise TypeError("categorical_vocabulary_sizes must be a list of int")
+
+        if isinstance(categorical_embedding_dims, list):
+            if len(categorical_vocabulary_sizes) != len(categorical_embedding_dims):
+                raise ValueError(
+                    "Categorical vocabulary sizes and their embedding dimensions must have the same length"
+                )
+
+        if num_categorical_features is not None:
+            if len(categorical_vocabulary_sizes) != num_categorical_features:
+                raise ValueError(
+                    "len(categorical_vocabulary_sizes) must be equal to num_categorical_features"
+                )
+        else:
+            num_categorical_features = len(categorical_vocabulary_sizes)
+    else:
+        logger.warning(
+            "categorical_embedding_dims provided but not categorical_vocabulary_sizes. It will be inferred later"
+        )
+
+    if num_categorical_features is not None:
+        if isinstance(categorical_embedding_dims, int):
+            categorical_embedding_dims = [
+                categorical_embedding_dims
+            ] * num_categorical_features
+        elif not isinstance(categorical_embedding_dims, list):
+            raise TypeError("categorical_embedding_dims must be an int or a list of int")
+        elif len(categorical_embedding_dims) != num_categorical_features:
+            raise ValueError(
+                f"len(categorical_embedding_dims)({len(categorical_embedding_dims)}) "
+                f"should be equal to num_categorical_features({num_categorical_features})"
+            )
+    elif isinstance(categorical_embedding_dims, list):
+        num_categorical_features = len(categorical_embedding_dims)
+    else:
+        logger.warning(
+            "categorical_embedding_dims provided as int but not num_categorical_features. It will be inferred later"
+        )
+    return categorical_vocabulary_sizes, categorical_embedding_dims, num_categorical_features
 
 class NumpyJSONEncoder(json.JSONEncoder):
     def default(self, obj):

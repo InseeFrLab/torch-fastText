@@ -20,6 +20,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         texts: List[str],
         outputs: List[int],
         tokenizer: NGramTokenizer,
+        **kwargs,
     ):
         """
         Constructor for the TorchDataset class.
@@ -114,6 +115,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         shuffle: bool = False,
         drop_last: bool = False,
         num_workers: int = 0,
+        **kwargs
     ) -> torch.utils.data.DataLoader:
         """
         Creates a Dataloader.
