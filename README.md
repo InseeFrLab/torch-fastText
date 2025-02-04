@@ -40,7 +40,7 @@ from torchFastText import torchFastText
 
 # Initialize the model
 model = torchFastText(
-    num_buckets=1000000,
+    num_tokens=1000000,
     embedding_dim=100,
     min_count=5,
     min_n=3,
