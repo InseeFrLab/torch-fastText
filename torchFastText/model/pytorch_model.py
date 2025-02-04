@@ -91,6 +91,7 @@ class FastTextModel(nn.Module):
         self.embedding_dim = embedding_dim
         self.direct_bagging = direct_bagging
         self.sparse = sparse
+        self.average_cat_embed = False
 
         if categorical_embedding_dims is not None:
             self.categorical_embedding_dims = categorical_embedding_dims

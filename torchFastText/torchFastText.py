@@ -95,14 +95,16 @@ class torchFastText:
     trained: bool = field(init=False, default=False)
 
     def __post_init__(self):
+        self._validate_categorical_inputs()
+
+    def _validate_categorical_inputs(self):
         self.categorical_vocabulary_sizes,
         self.categorical_embedding_dims,
         self.num_categorical_features = validate_categorical_inputs(
                                                                 self.categorical_vocabulary_sizes,
                                                                 self.categorical_embedding_dims,
                                                                 self.num_categorical_features
-                                                                   )
-            
+                                                                   )    
     def _build_pytorch_model(self):
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
@@ -315,7 +317,7 @@ class torchFastText:
                     )
             self.categorical_vocabulary_sizes = list(categorical_vocabulary_sizes)
         else:
-            if categorical_vocabulary_sizes is not None:
+            if self.categorical_vocabulary_sizes is not None:
                 logger.warning(
                     "categorical_vocabulary_sizes was provided at initialization but no categorical variables are provided in X_train. Updating to None."
                 )
