@@ -73,8 +73,8 @@ Please make sure `y_train` contains at least one time each possible label.
 
 ## Categorical features
 
-If any, each categorical feature $i$ is associated to an embedding matrix of size $( 
-  n_{vocab}^{cat_{i}}, d_{embed}^{{cat}_i})$, where $n_{vocab}^{cat_{i}}$ is the number of unique values in the feature $i$, and $ d_{embed}^{{cat}_i}$ is a hyperparameter (`categorical_embedding_dims`) - chosen by the user - that can take three type of values:
+If any, each categorical feature $i$ is associated to an embedding matrix of size (number of unique values, embedding dimension) where the latter is a hyperparameter (`categorical_embedding_dims`) - chosen by the user - that can take three types of values:
+
 - `None`: same embedding dimension as the token embedding matrix. The categorical embeddings are then summed to the sentence-level embedding (which itself is an averaging of the token embeddings). See [Figure 1](#Default-architecture).
 - `int`: the categorical embeddings have all the same embedding dimensions, they are averaged and the resulting vector is concatenated to the sentence-level embedding (the last linear layer has an adapted input size). See [Figure 2](#avg-architecture).
 - `list`: the categorical embeddings have different embedding dimensions, all of them are concatenated without aggregation to the sentence-level embedding (the last linear layer has an adapted input size). See [Figure 3](#concat-architecture).
