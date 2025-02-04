@@ -95,7 +95,13 @@ class torchFastText:
     trained: bool = field(init=False, default=False)
 
     def __post_init__(self):
-        self.categorical_vocabulary_sizes, self.categorical_embedding_dims, self.num_categorical_features = validate_categorical_inputs(self.categorical_vocabulary_sizes, self.categorical_embedding_dims, self.num_categorical_features)
+        self.categorical_vocabulary_sizes,
+        self.categorical_embedding_dims,
+        self.num_categorical_features = validate_categorical_inputs(
+                                                                self.categorical_vocabulary_sizes,
+                                                                self.categorical_embedding_dims,
+                                                                self.num_categorical_features
+                                                                   )
             
     def _build_pytorch_model(self):
         self.pytorch_model = FastTextModel(

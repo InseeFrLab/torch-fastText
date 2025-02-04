@@ -71,6 +71,30 @@ Please make sure `y_train` contains at least one time each possible label.
 - PyTorch Lightning
 - NumPy
 
+## Categorical features
+
+If any, each categorical feature $i$ is associated to an embedding matrix of size $( 
+  n_{vocab}^{cat_{i}})$, where $\text{vocab\_size}_i$ is the number of unique values in the feature $i$, and $\text{embedding\_dim}_i$ is a hyperparameter - chosen by the user - that can take three type of values:
+- `None`: same embedding dimension as the token embedding matrix. The categorical embeddings are then summed to the sentence-level embedding (which itself is an averaging of the token embeddings). See [Figure 1](#Default-architecture).
+- `int`: the categorical embeddings have all the same embedding dimensions, they are averaged and the resulting vector is concatenated to the sentence-level embedding (the last linear layer has an adapted input size). See [Figure 2](#avg-architecture).
+- `list`: the categorical embeddings have different embedding dimensions, all of them are concatenated without aggregation to the sentence-level embedding (the last linear layer has an adapted input size). See [Figure 3](#concat-architecture).
+
+Default is `None`.
+
+<a name="figure-1"></a>
+![Default-architecture](images/NN.drawio.png "Default architecture")  
+*Figure 1: The 'sum' architecture*
+
+
+
+<a name="figure-2"></a>
+![avg-architecture](images/avg_concat.png "Default architecture")  
+*Figure 2: The 'average and concatenate' architecture*
+
+<a name="figure-3"></a>
+![concat-architecture](images/full_concat.png "Default architecture")  
+*Figure 3: The 'concatenate all' architecture*
+
 ## Documentation
 
 For detailed usage and examples, please refer to the [experiments notebook](experiments.ipynb). Use `pip install -r requirements.txt` after cloning the repository to install the necessary dependencies (some are specific to the notebook).
@@ -82,6 +106,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 MIT
+
+
 ## References
 
 Inspired by the original FastText paper [1] and implementation.
