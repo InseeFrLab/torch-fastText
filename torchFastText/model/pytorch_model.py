@@ -67,7 +67,13 @@ class FastTextModel(nn.Module):
         """
         super(FastTextModel, self).__init__()
 
-        categorical_vocabulary_sizes, categorical_embedding_dims, num_categorical_features = validate_categorical_inputs(categorical_vocabulary_sizes, categorical_embedding_dims,num_categorical_features=None)
+        categorical_vocabulary_sizes,
+        categorical_embedding_dims,
+        num_categorical_features = validate_categorical_inputs(
+                                                                categorical_vocabulary_sizes,
+                                                                categorical_embedding_dims,
+                                                                num_categorical_features=None
+                                                               )
 
         if tokenizer is None:
             if num_tokens is None:
