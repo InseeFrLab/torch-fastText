@@ -64,7 +64,7 @@ def data():
 
 @pytest.fixture(scope='session', autouse=True)
 def model():
-    num_buckets = 4
+    num_tokens = 4
     embedding_dim = 10
     min_count = 1
     min_n = 2
@@ -72,7 +72,7 @@ def model():
     len_word_ngrams = 2
     sparse = False
     return torchFastText(
-        num_buckets=num_buckets,
+        num_tokens=num_tokens,
         embedding_dim=embedding_dim,
         min_count=min_count,
         min_n=min_n,
@@ -85,7 +85,7 @@ def model():
 
 def test_model_initialization(model, data):
     assert isinstance(model, torchFastText)
-    assert model.num_buckets == 4
+    assert model.num_tokens == 4
     assert model.embedding_dim == 10
     assert model.min_count == 1
     assert model.min_n == 2
