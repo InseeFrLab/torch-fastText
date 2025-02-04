@@ -55,6 +55,9 @@ def validate_categorical_inputs(categorical_vocabulary_sizes: List[int],
                                 categorical_embedding_dims: Union[List[int], int],
                                 num_categorical_features: int = None):
     
+    if categorical_vocabulary_sizes is None:
+        return None, None, None
+    
     if categorical_vocabulary_sizes is not None:
         if not isinstance(categorical_vocabulary_sizes, list):
             raise TypeError("categorical_vocabulary_sizes must be a list of int")
