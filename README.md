@@ -85,8 +85,6 @@ Default is `None`.
 ![Default-architecture](images/NN.drawio.png "Default architecture")  
 *Figure 1: The 'sum' architecture*
 
-
-
 <a name="figure-2"></a>
 ![avg-architecture](images/avg_concat.png "Default architecture")  
 *Figure 2: The 'average and concatenate' architecture*
