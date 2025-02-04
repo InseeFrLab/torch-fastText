@@ -95,7 +95,7 @@ Default is `None`.
 
 ## Documentation
 
-For detailed usage and examples, please refer to the [experiments notebook](experiments.ipynb). Use `pip install -r requirements.txt` after cloning the repository to install the necessary dependencies (some are specific to the notebook).
+For detailed usage and examples, please refer to the [example notebook](notebooks/example.ipynb). Use `pip install -r requirements.txt` after cloning the repository to install the necessary dependencies (some are specific to the notebook).
 
 ## Contributing
 
