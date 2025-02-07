@@ -245,17 +245,22 @@ class NGramTokenizer:
 
         return torch.Tensor(all_indices), id_to_token, all_tokens_id
 
-    def tokenize(self, text: list[str], text_tokens=True):
+    def tokenize(self, text: list[str], text_tokens=True, preprocess=True):
         """
         Tokenize a list of sentences.
 
         Args:
-            sentence (list[str]): List of sentences.
+            text (list[str]): List of sentences.
+            text_tokens (bool): If True, return tokenized text in tokens.
+            preprocess (bool): If True, preprocess text. Needs unidecode library.
 
         Returns:
             np.array: Array of indices.
         """
-        text = clean_text_feature(text)
+
+        if preprocess:
+            text = clean_text_feature(text)
+
         tokenized_text = []
         id_to_token_dicts = []
         token_to_id_dicts = []

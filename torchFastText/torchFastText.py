@@ -662,17 +662,25 @@ class torchFastText:
 
         return self.trainer.test(self.pytorch_model, test_dataloaders=dataloader, verbose=False)
 
-    def predict(self, X, top_k=1):
+    def predict(self, X, top_k=1, preprocess=True):
         """
         Predicts the "top_k" classes of the input text.
 
         Args:
             X (np.ndarray): Array of shape (N,d) with the first column being the text and the rest being the categorical variables.
             top_k (int): Number of classes to predict (by order of confidence).
+            preprocess (bool): Whether to preprocess the text before predicting.
 
         Returns:
             np.ndarray: Array of shape (N,top_k)
         """
+
+        if preprocess:
+            logger.info(
+                "Preprocessing is set to True. Input text will be preprocessed, requiring NLTK and Unidecode librairies."
+            )
+        else:
+            logger.info("Preprocessing is set to False. Input text will not be preprocessed and fed as is to the model.")
 
         if not self.trained:
             raise Exception("Model must be trained first.")
@@ -687,7 +695,9 @@ class torchFastText:
         else:
             assert self.pytorch_model.no_cat_var == True
 
-        return self.pytorch_model.predict(text, categorical_variables, top_k=top_k)
+        return self.pytorch_model.predict(text, categorical_variables, top_k=top_k,
+                                          preprocess=preprocess
+                                          )
 
     def predict_and_explain(self, X, top_k=1):
         if not self.trained:
