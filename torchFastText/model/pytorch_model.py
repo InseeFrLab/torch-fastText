@@ -206,7 +206,7 @@ class FastTextModel(nn.Module):
         return z
 
     def predict(
-        self, text: List[str], categorical_variables: List[List[int]], top_k=1, explain=False
+        self, text: List[str], categorical_variables: List[List[int]], top_k=1, explain=False, preprocess=True
     ):
         """
         Args:
@@ -215,6 +215,7 @@ class FastTextModel(nn.Module):
                 pass to the model for inference.
             top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
             explain (bool): launch gradient integration to have an explanation of the prediction (default: False)
+            preprocess (bool): If True, preprocess text. Needs unidecode library.
 
         Returns:
         if explain is False:
@@ -261,7 +262,7 @@ class FastTextModel(nn.Module):
         batch_size = len(text)
 
         indices_batch, id_to_token_dicts, token_to_id_dicts = self.tokenizer.tokenize(
-            text, text_tokens=False
+            text, text_tokens=False, preprocess=preprocess
         )
 
         padding_index = (
