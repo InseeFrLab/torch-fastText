@@ -80,15 +80,17 @@ def validate_categorical_inputs(categorical_vocabulary_sizes: List[int],
             num_categorical_features = len(categorical_vocabulary_sizes)
         
     assert num_categorical_features is not None, "num_categorical_features should be inferred at this point."
-
-    if isinstance(categorical_embedding_dims, int):
-        categorical_embedding_dims = [
-            categorical_embedding_dims
-        ] * num_categorical_features
-    elif not isinstance(categorical_embedding_dims, list):
-        raise TypeError("categorical_embedding_dims must be an int or a list of int")
     
-    assert isinstance(categorical_embedding_dims, list), "categorical_embedding_dims must be a list of int at this point"
+    # "Transform" embedding dims into a suitable list, or stay None
+    if categorical_embedding_dims is not None:
+        if isinstance(categorical_embedding_dims, int):
+            categorical_embedding_dims = [
+                categorical_embedding_dims
+            ] * num_categorical_features
+        elif not isinstance(categorical_embedding_dims, list):
+            raise TypeError("categorical_embedding_dims must be an int or a list of int")
+    
+    assert isinstance(categorical_embedding_dims, list) or categorical_embedding_dims is None, "categorical_embedding_dims must be a list of int at this point"
 
     return categorical_vocabulary_sizes, categorical_embedding_dims, num_categorical_features
 

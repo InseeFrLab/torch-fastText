@@ -8,6 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from torchFastText import torchFastText
 from torchFastText.preprocess import clean_text_feature
+from  torchFastText.datasets import NGramTokenizer
 
 source_path = Path(__file__).resolve()
 source_dir = source_path.parent
@@ -80,7 +81,39 @@ def model():
         len_word_ngrams=len_word_ngrams,
         sparse=sparse,
     )
+def test_building(data):
+    num_tokens = 4
+    embedding_dim = 10
+    min_count = 1
+    min_n = 2
+    max_n = 5
+    len_word_ngrams = 2
+    sparse = False
+    vocab_possible_values = [None, [5, 6 , 7, 8]]
+    embedding_dim_possible_values = [[10, 20, 3, 7], 10, None]
+    num_cat_possible_values = [None, 4]
 
+
+    for vocab in vocab_possible_values:
+        for cat_embedding_dim in embedding_dim_possible_values:
+            for num_cat in num_cat_possible_values:
+                model = torchFastText(
+                    num_tokens=num_tokens,
+                    num_rows=num_tokens,
+                    embedding_dim=embedding_dim,
+                    min_count=min_count,
+                    min_n=min_n,
+                    max_n=max_n,
+                    len_word_ngrams=len_word_ngrams,
+                    sparse=sparse,
+                    categorical_embedding_dims=cat_embedding_dim,
+                    categorical_vocabulary_sizes=vocab,
+                    num_categorical_features=num_cat,
+                    num_classes = 3
+                )
+                model._build_pytorch_model()
+                assert True, "Model built without errors"
+    assert True, "Model built without errors"
 
 
 def test_model_initialization(model, data):
@@ -108,8 +141,6 @@ def test_model_initialization(model, data):
     tokenized_text_tokens, tokenized_text, id_to_token_dicts, token_to_id_dicts= tokenizer.tokenize(["Nouveau budget présenté par le gouvernement"])
     assert isinstance(tokenized_text, list)
     assert len(tokenized_text) > 0
-    #assert "gouvern </s>" in tokenized_text_tokens[0]
+
     predictions, confidence, all_scores, all_scores_letters = model.predict_and_explain(np.asarray(["Nouveau budget présenté par le gouvernement"]), 2)
     assert predictions.shape == (1, 2)
-    # "predictions" contains the predicted class for each input text, in int format. Need to decode back to have the string format
-    

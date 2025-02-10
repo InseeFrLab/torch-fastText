@@ -3,7 +3,7 @@ FastText model implemented with Pytorch.
 Integrates additional categorical features.
 """
 
-from typing import List
+from typing import List, Union
 import logging
 
 import torch
@@ -44,9 +44,9 @@ class FastTextModel(nn.Module):
         embedding_dim: int,
         num_classes: int,
         tokenizer=None,
-        num_tokens: int = None,
+        num_rows: int = None,
         categorical_vocabulary_sizes: List[int] = None,
-        categorical_embedding_dims: List[int] = None,
+        categorical_embedding_dims: Union[List[int], int] = None,
         padding_idx: int = 0,
         sparse: bool = True,
         direct_bagging: bool = False,
@@ -79,17 +79,21 @@ class FastTextModel(nn.Module):
                 num_categorical_features=None,
             )
             )
-        assert isinstance(categorical_embedding_dims, list), "categorical_embedding_dims must be a list of int at this stage"
+    
+        assert isinstance(categorical_embedding_dims, list) or categorical_embedding_dims is None, "categorical_embedding_dims must be a list of int at this stage"
         
+        if categorical_embedding_dims is None:
+            self.average_cat_embed = False
+
         if tokenizer is None:
-            if num_tokens is None:
-                raise ValueError("Either tokenizer or num_tokens must be provided (number of rows in the embedding matrix).")
+            if num_rows is None:
+                raise ValueError("Either tokenizer or num_rows must be provided (number of rows in the embedding matrix).")
         else:
-            if num_tokens is not None:
-                if num_tokens != tokenizer.num_tokens:
-                    logger.warning("num_tokens is different from the number of tokens in the tokenizer. Using provided num_tokens.")
+            if num_rows is not None:
+                if num_rows != tokenizer.num_tokens:
+                    logger.warning("num_rows is different from the number of tokens in the tokenizer. Using provided num_rows.")
         
-        self.num_tokens = num_tokens
+        self.num_rows = num_rows
 
         self.num_classes = num_classes
         self.padding_idx = padding_idx
@@ -104,13 +108,13 @@ class FastTextModel(nn.Module):
         self.embeddings = (
             nn.Embedding(
                 embedding_dim=embedding_dim,
-                num_embeddings=num_tokens,
+                num_embeddings=num_rows,
                 padding_idx=padding_idx,
                 sparse=sparse,
             )
             if not direct_bagging
             else nn.EmbeddingBag(
-                embedding_dim=embedding_dim, num_embeddings=num_tokens, sparse=sparse, mode="mean"
+                embedding_dim=embedding_dim, num_embeddings=num_rows, sparse=sparse, mode="mean"
             )
         )
 
@@ -126,16 +130,16 @@ class FastTextModel(nn.Module):
 
         if categorical_vocabulary_sizes is not None:
             self.no_cat_var = False
-            for var_idx, num_tokens in enumerate(categorical_vocabulary_sizes):
+            for var_idx, num_rows in enumerate(categorical_vocabulary_sizes):
                 if categorical_embedding_dims is not None:
                     emb = nn.Embedding(
-                        embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=num_tokens
+                        embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=num_rows
                     )  # concatenate to sentence embedding
                     if not self.average_cat_embed:
                         dim_in_last_layer += categorical_embedding_dims[var_idx]
                 else:
                     emb = nn.Embedding(
-                        embedding_dim=embedding_dim, num_embeddings=num_tokens
+                        embedding_dim=embedding_dim, num_embeddings=num_rows
                     )  # sum to sentence embedding
                 self.categorical_embedding_layers[var_idx] = emb
                 setattr(self, "emb_{}".format(var_idx), emb)
@@ -243,7 +247,7 @@ class FastTextModel(nn.Module):
                 # Get back the classical embedding layer for explainability
                 new_embed_layer = nn.Embedding(
                     embedding_dim=self.embedding_dim,
-                    num_embeddings=self.num_tokens,
+                    num_embeddings=self.num_rows,
                     padding_idx=self.padding_idx,
                     sparse=self.sparse,
                 )
@@ -317,7 +321,7 @@ class FastTextModel(nn.Module):
             if flag_change_embed:
                 new_embed_layer = nn.EmbeddingBag(
                     embedding_dim=self.embedding_dim,
-                    num_embeddings=self.num_tokens,
+                    num_embeddings=self.num_rows,
                     padding_idx=self.padding_idx,
                     sparse=self.sparse,
                 )
