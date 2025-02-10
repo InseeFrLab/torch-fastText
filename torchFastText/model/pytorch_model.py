@@ -67,6 +67,11 @@ class FastTextModel(nn.Module):
         """
         super(FastTextModel, self).__init__()
 
+        if isinstance(categorical_embedding_dims, int):
+            self.average_cat_embed = True  # if provided categorical embedding dims is an int, average the categorical embeddings before concatenating to sentence embedding
+        else:
+            self.average_cat_embed = False
+
         categorical_vocabulary_sizes,
         categorical_embedding_dims,
         num_categorical_features = validate_categorical_inputs(
@@ -75,6 +80,8 @@ class FastTextModel(nn.Module):
                                                                 num_categorical_features=None
                                                                )
 
+        assert isinstance(categorical_embedding_dims, list), "categorical_embedding_dims must be a list of int at this stage"
+        
         if tokenizer is None:
             if num_tokens is None:
                 raise ValueError("Either tokenizer or num_tokens must be provided (number of rows in the embedding matrix).")
@@ -91,13 +98,9 @@ class FastTextModel(nn.Module):
         self.embedding_dim = embedding_dim
         self.direct_bagging = direct_bagging
         self.sparse = sparse
-        self.average_cat_embed = False
 
         if categorical_embedding_dims is not None:
             self.categorical_embedding_dims = categorical_embedding_dims
-
-            if len(set(categorical_embedding_dims)) == 1:
-                self.average_cat_embed = True  # if categorical embedding dims are the same, we average them before concatenating to the sentence embedding
 
         self.embeddings = (
             nn.Embedding(
