@@ -18,7 +18,7 @@ from .datasets.dataset import FastTextModelDataset
 from .datasets.tokenizer import NGramTokenizer
 from .model.pytorch_model import FastTextModel
 from .model.lightning_module import FastTextModule
-from .utilities.checkers import check_X, check_Y, validate_categorical_inputs, NumpyJSONEncoder
+from .utilities.checkers import check_X, check_Y, NumpyJSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -69,19 +69,19 @@ class torchFastText:
     # Required parameters
 
     # Embedding matrix
-    num_tokens: int
     embedding_dim: int
     sparse: bool
 
     # Tokenizer-related
+    num_tokens: int
     min_count: int
     min_n: int
     max_n: int
     len_word_ngrams: int
 
     # Optional parameters with default values
-
     num_classes: Optional[int] = None
+    num_rows: Optional[int] = None # Default = num_tokens + tokenizer.get_nwords() + 1, but can be customized
 
     # Embedding matrices of categorical variables
     categorical_vocabulary_sizes: Optional[List[int]] = None
@@ -94,26 +94,30 @@ class torchFastText:
     lightning_module: Optional[FastTextModule] = field(init=True, default=None)
     trained: bool = field(init=False, default=False)
 
-    def __post_init__(self):
-        self._validate_categorical_inputs()
-
-    def _validate_categorical_inputs(self):
-        self.categorical_vocabulary_sizes,
-        self.categorical_embedding_dims,
-        self.num_categorical_features = validate_categorical_inputs(
-                                                                self.categorical_vocabulary_sizes,
-                                                                self.categorical_embedding_dims,
-                                                                self.num_categorical_features
-                                                                   )    
     def _build_pytorch_model(self):
+
+        if self.num_rows is None:
+            if self.tokenizer is None:
+                raise ValueError(
+            "Please provide a tokenizer (for instance using model.build_tokenizer()) or num_rows."
+                                )
+
+            else:
+                self.num_rows = self.num_tokens + self.tokenizer.get_nwords() + 1
+        
+        if self.tokenizer is None:
+            self.padding_idx = self.num_tokens
+        else:
+            self.padding_idx = self.num_tokens + self.tokenizer.get_nwords()
+
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
             embedding_dim=self.embedding_dim,
-            num_tokens=self.num_tokens + self.tokenizer.get_nwords() + 1,
+            num_rows=self.num_rows,
             num_classes=self.num_classes,
             categorical_vocabulary_sizes=self.categorical_vocabulary_sizes,
             categorical_embedding_dims=self.categorical_embedding_dims,
-            padding_idx=self.num_tokens + self.tokenizer.get_nwords(),
+            padding_idx=self.padding_idx,
             sparse=self.sparse,
             direct_bagging=True,
         )
@@ -328,7 +332,6 @@ class torchFastText:
                 )
                 self.num_categorical_features = None
 
-        self._validate_categorical_inputs()
         self.build_tokenizer(training_text)
         self._build_pytorch_model()
 
