@@ -72,14 +72,13 @@ class FastTextModel(nn.Module):
         else:
             self.average_cat_embed = False
 
-        categorical_vocabulary_sizes,
-        categorical_embedding_dims,
-        num_categorical_features = validate_categorical_inputs(
-                                                                categorical_vocabulary_sizes,
-                                                                categorical_embedding_dims,
-                                                                num_categorical_features=None
-                                                               )
-
+        categorical_vocabulary_sizes, categorical_embedding_dims, num_categorical_features = (
+            validate_categorical_inputs(
+                categorical_vocabulary_sizes,
+                categorical_embedding_dims,
+                num_categorical_features=None,
+            )
+            )
         assert isinstance(categorical_embedding_dims, list), "categorical_embedding_dims must be a list of int at this stage"
         
         if tokenizer is None:
