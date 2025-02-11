@@ -665,7 +665,7 @@ class torchFastText:
 
         return self.trainer.test(self.pytorch_model, test_dataloaders=dataloader, verbose=False)
 
-    def predict(self, X, top_k=1, preprocess=True):
+    def predict(self, X, top_k=1, preprocess=False):
         """
         Predicts the "top_k" classes of the input text.
 
