@@ -34,6 +34,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
+
 class FastTextModel(nn.Module):
     """
     FastText Pytorch Model.
@@ -78,21 +79,27 @@ class FastTextModel(nn.Module):
                 categorical_embedding_dims,
                 num_categorical_features=None,
             )
-            )
-    
-        assert isinstance(categorical_embedding_dims, list) or categorical_embedding_dims is None, "categorical_embedding_dims must be a list of int at this stage"
-        
+        )
+
+        assert isinstance(categorical_embedding_dims, list) or categorical_embedding_dims is None, (
+            "categorical_embedding_dims must be a list of int at this stage"
+        )
+
         if categorical_embedding_dims is None:
             self.average_cat_embed = False
 
         if tokenizer is None:
             if num_rows is None:
-                raise ValueError("Either tokenizer or num_rows must be provided (number of rows in the embedding matrix).")
+                raise ValueError(
+                    "Either tokenizer or num_rows must be provided (number of rows in the embedding matrix)."
+                )
         else:
             if num_rows is not None:
                 if num_rows != tokenizer.num_tokens:
-                    logger.warning("num_rows is different from the number of tokens in the tokenizer. Using provided num_rows.")
-        
+                    logger.warning(
+                        "num_rows is different from the number of tokens in the tokenizer. Using provided num_rows."
+                    )
+
         self.num_rows = num_rows
 
         self.num_classes = num_classes
@@ -102,8 +109,7 @@ class FastTextModel(nn.Module):
         self.direct_bagging = direct_bagging
         self.sparse = sparse
 
-        if categorical_embedding_dims is not None:
-            self.categorical_embedding_dims = categorical_embedding_dims
+        self.categorical_embedding_dims = categorical_embedding_dims
 
         self.embeddings = (
             nn.Embedding(
@@ -160,6 +166,7 @@ class FastTextModel(nn.Module):
             torch.Tensor: Model output: score for each class.
         """
         x_1 = encoded_text
+        batch_size = x_1.size(0)
 
         if x_1.dtype != torch.long:
             x_1 = x_1.long()
@@ -189,10 +196,8 @@ class FastTextModel(nn.Module):
         if len(x_cat) > 0:  # if there are categorical variables
             if self.categorical_embedding_dims is not None:  # concatenate to sentence embedding
                 if self.average_cat_embed:  # unique cat_embedding_dim for all categorical variables
-                    x_cat = torch.stack(
-                        x_cat, dim=0
-                    ).mean(
-                        dim=0
+                    x_cat = (
+                        torch.stack(x_cat, dim=0).mean(dim=0).reshape(batch_size, -1)
                     )  # average over all the categorical variables, output shape is (batch_size, cat_embedding_dim)
                     x_in = torch.cat(
                         [x_1, x_cat], dim=1
@@ -212,7 +217,12 @@ class FastTextModel(nn.Module):
         return z
 
     def predict(
-        self, text: List[str], categorical_variables: List[List[int]], top_k=1, explain=False, preprocess=True
+        self,
+        text: List[str],
+        categorical_variables: List[List[int]],
+        top_k=1,
+        explain=False,
+        preprocess=True,
     ):
         """
         Args:
