@@ -88,6 +88,7 @@ class torchFastText:
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     num_categorical_features: Optional[int] = None
 
+
     # Internal fields (not exposed during initialization)
     tokenizer: Optional[NGramTokenizer] = field(init=True, default=None)
     pytorch_model: Optional[FastTextModel] = field(init=False, default=None)
@@ -443,6 +444,7 @@ class torchFastText:
 
         return train_dataloader, val_dataloader
 
+
     def train(
         self,
         X_train: np.ndarray,
@@ -461,8 +463,45 @@ class torchFastText:
         loss=torch.nn.CrossEntropyLoss(),
         patience_train=3,
         verbose: bool = False,
-        profiler=None
+        trainer_params: Optional[dict] = None,
     ):
+        """
+        Trains the FastText model using the provided training and validation data.
+        This method checks the provided inputs for consistency and correctness, builds the model if necessary,
+        creates data loaders for the training and validation datasets, and initiates the training process using a PyTorch Lightning trainer.
+        After training, it loads the best model checkpoint, moves the model to CPU, and sets the model to evaluation mode.
+        Parameters:
+            X_train (np.ndarray): Array containing the training data features.
+            y_train (np.ndarray): Array containing the training data labels.
+            X_val (np.ndarray): Array containing the validation data features.
+            y_val (np.ndarray): Array containing the validation data labels.
+            num_epochs (int): The maximum number of epochs for the training process.
+            batch_size (int): The size of the mini-batches used during training.
+            cpu_run (bool, optional): Whether to force the training to run on the CPU. Defaults to False.
+            num_workers (int, optional): Number of worker threads for data loading. Defaults to 12.
+            optimizer (optional): A PyTorch optimizer to use for training. Must be from torch.optim if provided.
+            optimizer_params (optional): Additional parameters for configuring the optimizer.
+            lr (float, optional): The learning rate for the optimizer.
+            scheduler (optional): A PyTorch learning rate scheduler. Defaults to torch.optim.lr_scheduler.ReduceLROnPlateau.
+            patience_scheduler (int, optional): Number of epochs with no improvement after which learning rate will be reduced. Defaults to 3.
+            loss (torch.nn.Module, optional): The loss function to optimize. Must be an instance of a PyTorch loss module. Defaults to torch.nn.CrossEntropyLoss().
+            patience_train (int, optional): Number of epochs with no improvement for early stopping. Defaults to 3.
+            verbose (bool, optional): Flag to enable verbose logging. Defaults to False.
+            trainer_params (Optional[dict], optional): Additional parameters to be passed to the PyTorch Lightning Trainer.
+        Returns:
+            None
+        Side Effects:
+            - Builds the tokenizer and PyTorch model if not already built.
+            - Creates training and validation data loaders.
+            - Initiates training using a PyTorch Lightning Trainer.
+            - Saves the best model checkpoint path in `self.best_model_path`.
+            - Loads the best model and sets it to evaluation mode.
+            - Sets `self.trained` to True upon successful training.
+        Raises:
+            AssertionError: If provided loss is not a PyTorch loss module, if optimizer is not from torch.optim,
+                            or if scheduler is not a PyTorch learning rate scheduler.
+            AssertionError: If there is a mismatch in the number of observations or the number of columns between the training and validation datasets.
+        """
         ##### Formatting exception handling #####
 
         assert isinstance(loss, torch.nn.Module), "loss must be a PyTorch loss function."
@@ -568,18 +607,19 @@ class torchFastText:
         # Strategy
         strategy = "auto"
         
-        #Profiler
-        self.profiler = profiler
+        train_params = {'callbacks': callbacks,
+            'max_epochs': num_epochs,
+            'num_sanity_val_steps': 2,
+            'strategy': strategy,
+            'log_every_n_steps': 1,
+            'enable_progress_bar': True,}
         
+        if trainer_params is not None:
+            train_params =  train_params | trainer_params
+      
         # Trainer
         self.trainer = pl.Trainer(
-            callbacks=callbacks,
-            max_epochs=num_epochs,
-            num_sanity_val_steps=2,
-            strategy=strategy,
-            log_every_n_steps=1,
-            enable_progress_bar=True,
-            profiler=self.profiler
+            **train_params
         )
 
         torch.cuda.empty_cache()
