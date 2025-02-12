@@ -114,7 +114,6 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         batch_size: int,
         shuffle: bool = False,
         drop_last: bool = False,
-        num_workers: int = 0,
         **kwargs
     ) -> torch.utils.data.DataLoader:
         """
@@ -135,5 +134,4 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             shuffle=shuffle,
             drop_last=drop_last,
             pin_memory=True,
-            num_workers=num_workers,
         )
