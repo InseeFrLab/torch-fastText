@@ -245,7 +245,7 @@ class NGramTokenizer:
 
         return torch.Tensor(all_indices), id_to_token, all_tokens_id
 
-    def tokenize(self, text: list[str], text_tokens=True, preprocess=True):
+    def tokenize(self, text: list[str], text_tokens=True, preprocess=False):
         """
         Tokenize a list of sentences.
 
