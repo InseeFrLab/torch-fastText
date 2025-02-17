@@ -120,7 +120,7 @@ class torchFastText:
             categorical_embedding_dims=self.categorical_embedding_dims,
             padding_idx=self.padding_idx,
             sparse=self.sparse,
-            direct_bagging=True,
+            direct_bagging=False,
         )
 
     def _check_and_init_lightning(
@@ -442,6 +442,8 @@ class torchFastText:
             batch_size=batch_size, num_workers=num_workers
         )
 
+        print(train_dataloader.num_workers)
+
         return train_dataloader, val_dataloader
 
 
@@ -562,13 +564,16 @@ class torchFastText:
                 lr=lr,
                 scheduler=scheduler,
                 patience_scheduler=patience_scheduler,
-                loss=loss,
+                loss=loss.to(self.device),
             )
             if verbose:
                 end = time.time()
                 logger.info("Model successfully built in {:.2f} seconds.".format(end - start))
 
         self.pytorch_model = self.pytorch_model.to(self.device)
+
+        print(self.device)
+
 
         # Dataloaders
         train_dataloader, val_dataloader = self.__build_data_loaders(
@@ -619,12 +624,13 @@ class torchFastText:
       
         # Trainer
         self.trainer = pl.Trainer(
-            **train_params
+            **train_params, accelerator="gpu"
         )
 
         torch.cuda.empty_cache()
         torch.set_float32_matmul_precision("medium")
 
+        print(train_dataloader.num_workers)
         if verbose:
             logger.info("Launching training...")
             start = time.time()
