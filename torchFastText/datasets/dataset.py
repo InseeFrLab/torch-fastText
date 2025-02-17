@@ -1,7 +1,7 @@
 """
 Dataset class for a FastTextModel without the fastText dependency.
 """
-
+import os
 from typing import List
 
 import torch
@@ -134,4 +134,5 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             shuffle=shuffle,
             drop_last=drop_last,
             pin_memory=True,
+            num_workers=os.cpu_count()-1,
         )
