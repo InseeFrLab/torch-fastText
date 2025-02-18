@@ -8,6 +8,15 @@ import torch
 
 from .tokenizer import NGramTokenizer
 
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler()],
+)
+
 
 class FastTextModelDataset(torch.utils.data.Dataset):
     """
@@ -135,6 +144,9 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             torch.utils.data.DataLoader: Dataloader.
         """
+
+        logger.info(f"Creating DataLoader with {num_workers} workers.")
+        
         return torch.utils.data.DataLoader(
             dataset=self,
             batch_size=batch_size,
