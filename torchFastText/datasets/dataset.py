@@ -2,6 +2,7 @@
 Dataset class for a FastTextModel without the fastText dependency.
 """
 import os
+import logging
 from typing import List
 
 import torch
@@ -146,7 +147,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         """
 
         logger.info(f"Creating DataLoader with {num_workers} workers.")
-        
+
         return torch.utils.data.DataLoader(
             dataset=self,
             batch_size=batch_size,
