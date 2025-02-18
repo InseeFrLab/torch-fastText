@@ -154,67 +154,68 @@ class FastTextModel(nn.Module):
 
         self.fc = nn.Linear(dim_in_last_layer, num_classes)
 
-    def forward(self, encoded_text, additional_inputs) -> torch.Tensor:
+    def forward(self, encoded_text: torch.Tensor, additional_inputs: torch.Tensor) -> torch.Tensor:
         """
-        Forward method.
+        Memory-efficient forward pass implementation.
 
         Args:
-            encoded_text (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized + padded text (in integer (indices))
-            additional_inputs (torch.Tensor[Long]): Additional categorical features, (batch_size , num_categorical_features)
+            encoded_text (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized + padded text
+            additional_inputs (torch.Tensor[Long]): Additional categorical features, (batch_size, num_categorical_features)
 
         Returns:
-            torch.Tensor: Model output: score for each class.
+            torch.Tensor: Model output scores for each class
         """
-        x_1 = encoded_text
-        batch_size = x_1.size(0)
-
-        if x_1.dtype != torch.long:
-            x_1 = x_1.long()
-
-        # Embed tokens + averaging = sentence embedding if direct_bagging
-        # No averaging if direct_bagging (handled directly by EmbeddingBag)
-        x_1 = self.embeddings(
-            x_1
-        )  # (batch_size, embedding_dim) if direct_bagging otherwise (batch_size, seq_len, embedding_dim)
-
-        if not self.direct_bagging:
-            # Aggregate the embeddings of the text tokens
-            non_zero_tokens = x_1.sum(-1) != 0
-            non_zero_tokens = non_zero_tokens.sum(-1)
-            x_1 = x_1.sum(dim=-2)  # (batch_size, embedding_dim)
-            x_1 /= non_zero_tokens.unsqueeze(-1)
-            x_1 = torch.nan_to_num(x_1)
-
-        # Embed categorical variables
-        x_cat = []
-        if not self.no_cat_var:
-            for i, (variable, embedding_layer) in enumerate(
-                self.categorical_embedding_layers.items()
-            ):
-                x_cat.append(embedding_layer(additional_inputs[:, i].long()).squeeze())
-
-        if len(x_cat) > 0:  # if there are categorical variables
-            if self.categorical_embedding_dims is not None:  # concatenate to sentence embedding
-                if self.average_cat_embed:  # unique cat_embedding_dim for all categorical variables
-                    x_cat = (
-                        torch.stack(x_cat, dim=0).mean(dim=0).reshape(batch_size, -1)
-                    )  # average over all the categorical variables, output shape is (batch_size, cat_embedding_dim)
-                    x_in = torch.cat(
-                        [x_1, x_cat], dim=1
-                    )  # (batch_size, embedding_dim + cat_embedding_dim)
-                else:
-                    x_in = torch.cat(
-                        [x_1] + x_cat, dim=1
-                    )  # direct concat without averaging, output shape is (batch_size, embedding_dim + sum(cat_embedding_dims))
-
-            else:  # sum over all the categorical variables, output shape is (batch_size, embedding_dim)
-                x_in = x_1 + torch.stack(x_cat, dim=0).sum(dim=0)
-
+        batch_size = encoded_text.size(0)
+        
+        # Ensure correct dtype and device once
+        if encoded_text.dtype != torch.long:
+            encoded_text = encoded_text.to(torch.long)
+        
+        # Compute text embeddings
+        if self.direct_bagging:
+            x_text = self.embeddings(encoded_text)  # (batch_size, embedding_dim)
         else:
-            x_in = x_1
-
-        z = self.fc(x_in)  # (batch_size, num_classes)
-        return z
+            # Compute embeddings and averaging in a memory-efficient way
+            x_text = self.embeddings(encoded_text)  # (batch_size, seq_len, embedding_dim)
+            # Calculate non-zero tokens mask once
+            non_zero_mask = (x_text.sum(-1) != 0).float()  # (batch_size, seq_len)
+            token_counts = non_zero_mask.sum(-1, keepdim=True)  # (batch_size, 1)
+            
+            # Sum and average in place
+            x_text = (x_text * non_zero_mask.unsqueeze(-1)).sum(dim=1)  # (batch_size, embedding_dim)
+            x_text = torch.div(x_text, token_counts.clamp(min=1.0))
+            x_text = torch.nan_to_num(x_text, 0.0)
+        
+        # Handle categorical variables efficiently
+        if not self.no_cat_var and additional_inputs.numel() > 0:
+            cat_embeds = []
+            # Process categorical embeddings in batch
+            for i, (_, embed_layer) in enumerate(self.categorical_embedding_layers.items()):
+                cat_input = additional_inputs[:, i].long()
+                cat_embed = embed_layer(cat_input)
+                if cat_embed.dim() > 2:
+                    cat_embed = cat_embed.squeeze(1)
+                cat_embeds.append(cat_embed)
+            
+            if cat_embeds:  # If we have categorical embeddings
+                if self.categorical_embedding_dims is not None:
+                    if self.average_cat_embed:
+                        # Stack and average in one operation
+                        x_cat = torch.stack(cat_embeds, dim=0).mean(dim=0)
+                        x_combined = torch.cat([x_text, x_cat], dim=1)
+                    else:
+                        # Optimize concatenation
+                        x_combined = torch.cat([x_text] + cat_embeds, dim=1)
+                else:
+                    # Sum embeddings efficiently
+                    x_combined = x_text + torch.stack(cat_embeds, dim=0).sum(dim=0)
+            else:
+                x_combined = x_text
+        else:
+            x_combined = x_text
+        
+        # Final linear layer
+        return self.fc(x_combined)
 
     def predict(
         self,

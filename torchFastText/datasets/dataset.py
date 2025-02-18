@@ -143,4 +143,5 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             drop_last=drop_last,
             pin_memory=True,
             num_workers=num_workers,
+            persistent_workers=True,
         )

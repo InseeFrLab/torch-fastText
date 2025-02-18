@@ -66,6 +66,7 @@ class FastTextModule(pl.LightningModule):
 
         Returns (torch.Tensor): Loss tensor.
         """
+        
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
@@ -74,6 +75,8 @@ class FastTextModule(pl.LightningModule):
         accuracy = self.accuracy_fn(outputs, targets)
         self.log("train_accuracy_epoch", accuracy, on_epoch=True, on_step=False, prog_bar=True)
         self.log("train_accuracy_step", accuracy, on_epoch=False, on_step=True, prog_bar=False)
+        
+        torch.cuda.empty_cache()
 
         return loss
 
