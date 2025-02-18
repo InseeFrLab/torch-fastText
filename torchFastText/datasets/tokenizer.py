@@ -4,10 +4,15 @@ NGramTokenizer class.
 
 import ctypes
 import json
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, Dict
 
 import numpy as np
 import torch
+from torch import Tensor
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from queue import Queue
+import multiprocessing
 
 from ..preprocess import clean_text_feature
 from ..utilities.utils import tokenized_text_in_tokens
@@ -201,7 +206,7 @@ class NGramTokenizer:
             pass
         return (tokens, indices)
 
-    def indices_matrix(self, sentence: str) -> np.array:
+    def indices_matrix(self, sentence: str) -> tuple[torch.Tensor, dict, dict]:
         """
         Returns an array of token indices for a text description.
 
@@ -209,41 +214,58 @@ class NGramTokenizer:
             sentence (str): Text description.
 
         Returns:
-            np.array: Array of indices.
+            tuple: (torch.Tensor of indices, id_to_token dict, token_to_id dict)
         """
+        # Pre-split the sentence once
+        words = sentence.split()
+        words.append("</s>")  # Add end of string token
+    
         indices = []
-        words = []
-        word_ngram_ids = []
         all_tokens_id = {}
-        for word in sentence.split(" "):
+        
+        # Process subwords in one batch
+        for word in words[:-1]:  # Exclude </s> from subword processing
             tokens, ind = self.get_subwords(word)
-            indices += ind
-            for idx, tok in enumerate(tokens):
-                if tok not in all_tokens_id.keys():
-                    all_tokens_id[tok] = ind[idx]
-
-            words += [word]
-        # Adding end of string token
-        indices += [0]
-        words += ["</s>"]
+            indices.extend(ind)
+            # Update dictionary with zip for efficiency
+            all_tokens_id.update(zip(tokens, ind))
+        
+        # Add </s> token
+        indices.append(0)
         all_tokens_id["</s>"] = 0
-
-        # Adding word n-grams
-        for word_ngram_len in range(2, self.word_ngrams + 1):
-            for i in range(len(words) - word_ngram_len + 1):
-                gram = words[i : i + word_ngram_len]
-                gram = " ".join(gram)
-
-                hashes = tuple(self.get_hash(word) for word in gram)
-                word_ngram_id = int(self.get_word_ngram_id(hashes, self.num_tokens, self.nwords))
-                all_tokens_id[gram] = word_ngram_id
-                word_ngram_ids.append(word_ngram_id)
-
-        all_indices = indices + word_ngram_ids
-
+        
+        # Compute word n-grams more efficiently
+        if self.word_ngrams > 1:
+            # Pre-compute hashes for all words to avoid repeated computation
+            word_hashes = [self.get_hash(word) for word in words]
+            
+            # Generate n-grams using sliding window
+            word_ngram_ids = []
+            for n in range(2, self.word_ngrams + 1):
+                for i in range(len(words) - n + 1):
+                    # Get slice of hashes for current n-gram
+                    gram_hashes = tuple(word_hashes[i:i + n])
+                    
+                    # Compute n-gram ID
+                    word_ngram_id = int(self.get_word_ngram_id(
+                        gram_hashes, 
+                        self.num_tokens, 
+                        self.nwords
+                    ))
+                    
+                    # Store gram and its ID
+                    gram = " ".join(words[i:i + n])
+                    all_tokens_id[gram] = word_ngram_id
+                    word_ngram_ids.append(word_ngram_id)
+            
+            # Extend indices with n-gram IDs
+            indices.extend(word_ngram_ids)
+        
+        # Create reverse mapping once at the end
         id_to_token = {v: k for k, v in all_tokens_id.items()}
-
-        return torch.Tensor(all_indices), id_to_token, all_tokens_id
+        
+        # Convert to tensor directly
+        return torch.tensor(indices, dtype=torch.long), id_to_token, all_tokens_id
 
     def tokenize(self, text: list[str], text_tokens=True, preprocess=False):
         """
