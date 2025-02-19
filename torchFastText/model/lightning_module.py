@@ -70,11 +70,9 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("train_loss_epoch", loss, on_epoch=True, on_step=False, prog_bar=True)
-        self.log("train_loss_step", loss, on_epoch=False, on_step=True, prog_bar=True)
+        self.log("train_loss", loss, on_epoch=True, on_step=True, prog_bar=True)
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log("train_accuracy_epoch", accuracy, on_epoch=True, on_step=False, prog_bar=True)
-        self.log("train_accuracy_step", accuracy, on_epoch=False, on_step=True, prog_bar=False)
+        self.log("train_accuracy", accuracy, on_epoch=True, on_step=False, prog_bar=True)
         
         torch.cuda.empty_cache()
 
@@ -93,11 +91,10 @@ class FastTextModule(pl.LightningModule):
         inputs, targets = batch[:-1], batch[-1]
         outputs = self.forward(inputs)
         loss = self.loss(outputs, targets)
-        self.log("val_loss", loss, on_epoch=True, on_step=True, prog_bar=True, sync_dist=True)
+        self.log("val_loss", loss, on_epoch=True, on_step=False, prog_bar=True, sync_dist=True)
 
         accuracy = self.accuracy_fn(outputs, targets)
-        self.log("validation_accuracy_epoch", accuracy, on_epoch=True, on_step=False, prog_bar=True)
-        self.log("validation_accuracy_step", accuracy, on_epoch=False, on_step=True, prog_bar=False)
+        self.log("val_accuracy", accuracy, on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx: int):
@@ -128,7 +125,7 @@ class FastTextModule(pl.LightningModule):
         scheduler = self.scheduler(optimizer, **self.scheduler_params)
         scheduler = {
             "scheduler": scheduler,
-            "monitor": "val_loss_epoch",
+            "monitor": "val_loss",
             "interval": self.scheduler_interval,
         }
 
