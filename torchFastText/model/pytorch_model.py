@@ -120,7 +120,8 @@ class FastTextModel(nn.Module):
             )
             if not direct_bagging
             else nn.EmbeddingBag(
-                embedding_dim=embedding_dim, num_embeddings=num_rows, sparse=sparse, mode="mean"
+                embedding_dim=embedding_dim, num_embeddings=num_rows, padding_idx=padding_idx, 
+                sparse=sparse, mode="mean"
             )
         )
 
