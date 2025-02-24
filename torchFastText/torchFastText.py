@@ -96,6 +96,8 @@ class torchFastText:
     lightning_module: Optional[FastTextModule] = field(init=True, default=None)
     trained: bool = field(init=False, default=False)
 
+    direct_bagging: Optional[bool] = True # Use nn.EmbeddingBag instead of nn.Embedding
+
     def _build_pytorch_model(self):
         if self.num_rows is None:
             if self.tokenizer is None:
@@ -127,7 +129,7 @@ class torchFastText:
             categorical_embedding_dims=self.categorical_embedding_dims,
             padding_idx=self.padding_idx,
             sparse=self.sparse,
-            direct_bagging=False,
+            direct_bagging=self.direct_bagging,
         )
 
     def _check_and_init_lightning(
