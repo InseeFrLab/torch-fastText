@@ -71,7 +71,6 @@ class torchFastText:
     # Embedding matrix
     embedding_dim: int
     sparse: bool
-    direct_bagging: Optional[bool] = True  # Use nn.EmbeddingBag instead of nn.Embedding
 
     # Tokenizer-related
     num_tokens: int
@@ -85,6 +84,8 @@ class torchFastText:
     num_rows: Optional[int] = (
         None  # Default = num_tokens + tokenizer.get_nwords() + 1, but can be customized
     )
+    direct_bagging: Optional[bool] = True  # Use nn.EmbeddingBag instead of nn.Embedding
+
 
     # Embedding matrices of categorical variables
     categorical_vocabulary_sizes: Optional[List[int]] = None
