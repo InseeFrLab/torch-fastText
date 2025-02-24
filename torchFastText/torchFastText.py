@@ -71,7 +71,7 @@ class torchFastText:
     # Embedding matrix
     embedding_dim: int
     sparse: bool
-    direct_bagging: Optional[bool] = True # Use nn.EmbeddingBag instead of nn.Embedding
+    direct_bagging: Optional[bool] = True  # Use nn.EmbeddingBag instead of nn.Embedding
 
     # Tokenizer-related
     num_tokens: int
@@ -573,7 +573,6 @@ class torchFastText:
         self.pytorch_model = self.pytorch_model.to(self.device)
 
         print(self.device)
-
 
         # Dataloaders
         train_dataloader, val_dataloader = self.__build_data_loaders(
