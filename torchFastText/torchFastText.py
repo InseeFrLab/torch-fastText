@@ -81,13 +81,14 @@ class torchFastText:
 
     # Optional parameters with default values
     num_classes: Optional[int] = None
-    num_rows: Optional[int] = None # Default = num_tokens + tokenizer.get_nwords() + 1, but can be customized
+    num_rows: Optional[int] = (
+        None  # Default = num_tokens + tokenizer.get_nwords() + 1, but can be customized
+    )
 
     # Embedding matrices of categorical variables
     categorical_vocabulary_sizes: Optional[List[int]] = None
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     num_categorical_features: Optional[int] = None
-
 
     # Internal fields (not exposed during initialization)
     tokenizer: Optional[NGramTokenizer] = field(init=True, default=None)
@@ -96,16 +97,15 @@ class torchFastText:
     trained: bool = field(init=False, default=False)
 
     def _build_pytorch_model(self):
-
         if self.num_rows is None:
             if self.tokenizer is None:
                 raise ValueError(
-            "Please provide a tokenizer (for instance using model.build_tokenizer()) or num_rows."
-                                )
+                    "Please provide a tokenizer (for instance using model.build_tokenizer()) or num_rows."
+                )
 
             else:
                 self.num_rows = self.num_tokens + self.tokenizer.get_nwords() + 1
-        
+
         if self.tokenizer is None:
             self.padding_idx = self.num_tokens
         else:
@@ -446,7 +446,6 @@ class torchFastText:
 
         return train_dataloader, val_dataloader
 
-
     def train(
         self,
         X_train: np.ndarray,
@@ -611,21 +610,21 @@ class torchFastText:
 
         # Strategy
         strategy = "auto"
-        
-        train_params = {'callbacks': callbacks,
-            'max_epochs': num_epochs,
-            'num_sanity_val_steps': 2,
-            'strategy': strategy,
-            'log_every_n_steps': 1,
-            'enable_progress_bar': True,}
-        
+
+        train_params = {
+            "callbacks": callbacks,
+            "max_epochs": num_epochs,
+            "num_sanity_val_steps": 2,
+            "strategy": strategy,
+            "log_every_n_steps": 1,
+            "enable_progress_bar": True,
+        }
+
         if trainer_params is not None:
-            train_params =  train_params | trainer_params
-      
+            train_params = train_params | trainer_params
+
         # Trainer
-        self.trainer = pl.Trainer(
-            **train_params, accelerator="gpu"
-        )
+        self.trainer = pl.Trainer(**train_params)
 
         torch.cuda.empty_cache()
         torch.set_float32_matmul_precision("medium")
@@ -717,7 +716,7 @@ class torchFastText:
 
         return self.trainer.test(self.pytorch_model, test_dataloaders=dataloader, verbose=False)
 
-    def predict(self, X, top_k=1, preprocess=False):
+    def predict(self, X, top_k=1, preprocess=False, verbose=False):
         """
         Predicts the "top_k" classes of the input text.
 
@@ -730,12 +729,12 @@ class torchFastText:
             np.ndarray: Array of shape (N,top_k)
         """
 
-        if preprocess:
+        if verbose:
             logger.info(
                 "Preprocessing is set to True. Input text will be preprocessed, requiring NLTK and Unidecode librairies."
+                if preprocess
+                else "Preprocessing is set to False. Input text will not be preprocessed and fed as is to the model."
             )
-        else:
-            logger.info("Preprocessing is set to False. Input text will not be preprocessed and fed as is to the model.")
 
         if not self.trained:
             raise Exception("Model must be trained first.")
@@ -750,9 +749,9 @@ class torchFastText:
         else:
             assert self.pytorch_model.no_cat_var == True
 
-        return self.pytorch_model.predict(text, categorical_variables, top_k=top_k,
-                                          preprocess=preprocess
-                                          )
+        return self.pytorch_model.predict(
+            text, categorical_variables, top_k=top_k, preprocess=preprocess
+        )
 
     def predict_and_explain(self, X, top_k=1):
         if not self.trained:
