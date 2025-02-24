@@ -71,6 +71,7 @@ class torchFastText:
     # Embedding matrix
     embedding_dim: int
     sparse: bool
+    direct_bagging: Optional[bool] = True # Use nn.EmbeddingBag instead of nn.Embedding
 
     # Tokenizer-related
     num_tokens: int
@@ -120,7 +121,7 @@ class torchFastText:
             categorical_embedding_dims=self.categorical_embedding_dims,
             padding_idx=self.padding_idx,
             sparse=self.sparse,
-            direct_bagging=False,
+            direct_bagging=self.direct_bagging,
         )
 
     def _check_and_init_lightning(
