@@ -592,7 +592,7 @@ class torchFastText:
         # Trainer callbacks
         checkpoints = [
             {
-                "monitor": "val_loss_epoch",
+                "monitor": "val_loss",
                 "save_top_k": 1,
                 "save_last": False,
                 "mode": "min",
@@ -601,7 +601,7 @@ class torchFastText:
         callbacks = [ModelCheckpoint(**checkpoint) for checkpoint in checkpoints]
         callbacks.append(
             EarlyStopping(
-                monitor="val_loss_epoch",
+                monitor="val_loss",
                 patience=patience_train,
                 mode="min",
             )
