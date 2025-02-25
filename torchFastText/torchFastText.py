@@ -84,6 +84,8 @@ class torchFastText:
     num_rows: Optional[int] = (
         None  # Default = num_tokens + tokenizer.get_nwords() + 1, but can be customized
     )
+    direct_bagging: Optional[bool] = True  # Use nn.EmbeddingBag instead of nn.Embedding
+
 
     # Embedding matrices of categorical variables
     categorical_vocabulary_sizes: Optional[List[int]] = None
@@ -120,7 +122,7 @@ class torchFastText:
             categorical_embedding_dims=self.categorical_embedding_dims,
             padding_idx=self.padding_idx,
             sparse=self.sparse,
-            direct_bagging=True,
+            direct_bagging=self.direct_bagging,
         )
 
     def _check_and_init_lightning(
@@ -561,7 +563,7 @@ class torchFastText:
                 lr=lr,
                 scheduler=scheduler,
                 patience_scheduler=patience_scheduler,
-                loss=loss,
+                loss=loss.to(self.device),
             )
             if verbose:
                 end = time.time()
@@ -587,7 +589,7 @@ class torchFastText:
         # Trainer callbacks
         checkpoints = [
             {
-                "monitor": "validation_loss_epoch",
+                "monitor": "val_loss",
                 "save_top_k": 1,
                 "save_last": False,
                 "mode": "min",
@@ -596,7 +598,7 @@ class torchFastText:
         callbacks = [ModelCheckpoint(**checkpoint) for checkpoint in checkpoints]
         callbacks.append(
             EarlyStopping(
-                monitor="validation_loss_epoch",
+                monitor="val_loss",
                 patience=patience_train,
                 mode="min",
             )
@@ -670,6 +672,8 @@ class torchFastText:
         self.max_n = self.tokenizer.max_n
         self.len_word_ngrams = self.tokenizer.word_ngrams
         self.no_cat_var = self.pytorch_model.no_cat_var
+
+        self.trained = True  # We consider the model as trained if loaded from a checkpoint
 
     def validate(self, X, Y, batch_size=256, num_workers=12):
         """
