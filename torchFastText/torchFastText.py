@@ -112,10 +112,12 @@ class torchFastText:
                     logger.warning(
                         f"Divergent values for num_rows: {self.num_rows} and {self.num_tokens + self.tokenizer.get_nwords() + 1}. It is set to the max."
                     )
-                self.num_rows = max(self.num_rows, self.num_tokens + self.tokenizer.get_nwords() + 1)
+                self.num_rows = max(
+                    self.num_rows, self.num_tokens + self.tokenizer.get_nwords() + 1
+                )
 
         self.padding_idx = self.num_rows - 1
-        
+
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
             embedding_dim=self.embedding_dim,
@@ -625,7 +627,7 @@ class torchFastText:
 
         # Trainer
         self.trainer = pl.Trainer(
-            **train_params, accelerator="gpu"
+            **train_params
         )
 
         torch.cuda.empty_cache()
