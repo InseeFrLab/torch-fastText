@@ -219,51 +219,49 @@ class NGramTokenizer:
         # Pre-split the sentence once
         words = sentence.split()
         words.append("</s>")  # Add end of string token
-    
+
         indices = []
         all_tokens_id = {}
-        
+
         # Process subwords in one batch
         for word in words[:-1]:  # Exclude </s> from subword processing
             tokens, ind = self.get_subwords(word)
             indices.extend(ind)
             # Update dictionary with zip for efficiency
             all_tokens_id.update(zip(tokens, ind))
-        
+
         # Add </s> token
         indices.append(0)
         all_tokens_id["</s>"] = 0
-        
+
         # Compute word n-grams more efficiently
         if self.word_ngrams > 1:
             # Pre-compute hashes for all words to avoid repeated computation
             word_hashes = [self.get_hash(word) for word in words]
-            
+
             # Generate n-grams using sliding window
             word_ngram_ids = []
             for n in range(2, self.word_ngrams + 1):
                 for i in range(len(words) - n + 1):
                     # Get slice of hashes for current n-gram
-                    gram_hashes = tuple(word_hashes[i:i + n])
-                    
+                    gram_hashes = tuple(word_hashes[i : i + n])
+
                     # Compute n-gram ID
-                    word_ngram_id = int(self.get_word_ngram_id(
-                        gram_hashes, 
-                        self.num_tokens, 
-                        self.nwords
-                    ))
-                    
+                    word_ngram_id = int(
+                        self.get_word_ngram_id(gram_hashes, self.num_tokens, self.nwords)
+                    )
+
                     # Store gram and its ID
-                    gram = " ".join(words[i:i + n])
+                    gram = " ".join(words[i : i + n])
                     all_tokens_id[gram] = word_ngram_id
                     word_ngram_ids.append(word_ngram_id)
-            
+
             # Extend indices with n-gram IDs
             indices.extend(word_ngram_ids)
-        
+
         # Create reverse mapping once at the end
         id_to_token = {v: k for k, v in all_tokens_id.items()}
-        
+
         # Convert to tensor directly
         return torch.tensor(indices, dtype=torch.long), id_to_token, all_tokens_id
 

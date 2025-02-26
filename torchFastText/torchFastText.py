@@ -442,8 +442,6 @@ class torchFastText:
             batch_size=batch_size, num_workers=num_workers
         )
 
-        print(train_dataloader.num_workers)
-
         return train_dataloader, val_dataloader
 
     def train(
@@ -571,9 +569,6 @@ class torchFastText:
 
         self.pytorch_model = self.pytorch_model.to(self.device)
 
-        print(self.device)
-
-
         # Dataloaders
         train_dataloader, val_dataloader = self.__build_data_loaders(
             train_categorical_variables=train_categorical_variables,
@@ -631,7 +626,6 @@ class torchFastText:
         torch.cuda.empty_cache()
         torch.set_float32_matmul_precision("medium")
 
-        print(train_dataloader.num_workers)
         if verbose:
             logger.info("Launching training...")
             start = time.time()

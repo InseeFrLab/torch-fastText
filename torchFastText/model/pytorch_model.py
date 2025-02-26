@@ -120,8 +120,11 @@ class FastTextModel(nn.Module):
             )
             if not direct_bagging
             else nn.EmbeddingBag(
-                embedding_dim=embedding_dim, num_embeddings=num_rows, padding_idx=padding_idx, 
-                sparse=sparse, mode="mean"
+                embedding_dim=embedding_dim,
+                num_embeddings=num_rows,
+                padding_idx=padding_idx,
+                sparse=sparse,
+                mode="mean",
             )
         )
 
@@ -167,11 +170,11 @@ class FastTextModel(nn.Module):
             torch.Tensor: Model output scores for each class
         """
         batch_size = encoded_text.size(0)
-        
+
         # Ensure correct dtype and device once
         if encoded_text.dtype != torch.long:
             encoded_text = encoded_text.to(torch.long)
-        
+
         # Compute text embeddings
         if self.direct_bagging:
             x_text = self.embeddings(encoded_text)  # (batch_size, embedding_dim)
@@ -181,12 +184,14 @@ class FastTextModel(nn.Module):
             # Calculate non-zero tokens mask once
             non_zero_mask = (x_text.sum(-1) != 0).float()  # (batch_size, seq_len)
             token_counts = non_zero_mask.sum(-1, keepdim=True)  # (batch_size, 1)
-            
+
             # Sum and average in place
-            x_text = (x_text * non_zero_mask.unsqueeze(-1)).sum(dim=1)  # (batch_size, embedding_dim)
+            x_text = (x_text * non_zero_mask.unsqueeze(-1)).sum(
+                dim=1
+            )  # (batch_size, embedding_dim)
             x_text = torch.div(x_text, token_counts.clamp(min=1.0))
             x_text = torch.nan_to_num(x_text, 0.0)
-        
+
         # Handle categorical variables efficiently
         if not self.no_cat_var and additional_inputs.numel() > 0:
             cat_embeds = []
@@ -197,7 +202,7 @@ class FastTextModel(nn.Module):
                 if cat_embed.dim() > 2:
                     cat_embed = cat_embed.squeeze(1)
                 cat_embeds.append(cat_embed)
-            
+
             if cat_embeds:  # If we have categorical embeddings
                 if self.categorical_embedding_dims is not None:
                     if self.average_cat_embed:
@@ -214,7 +219,7 @@ class FastTextModel(nn.Module):
                 x_combined = x_text
         else:
             x_combined = x_text
-        
+
         # Final linear layer
         return self.fc(x_combined)
 
