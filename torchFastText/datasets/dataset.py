@@ -1,6 +1,7 @@
 """
 Dataset class for a FastTextModel without the fastText dependency.
 """
+
 import os
 import logging
 from typing import List
@@ -85,45 +86,47 @@ class FastTextModelDataset(torch.utils.data.Dataset):
     def collate_fn(self, batch):
         """
         Efficient batch processing without explicit loops.
-        
+
         Args:
             batch: Data batch.
-            
+
         Returns:
             Tuple[torch.LongTensor]: Observation with given index.
         """
         # Unzip the batch in one go using zip(*batch)
         text, *categorical_vars, y = zip(*batch)
-        
+
         # Convert text to indices in parallel using map
         indices_batch = list(map(lambda x: self.tokenizer.indices_matrix(x)[0], text))
-        
+
         # Get padding index once
         padding_index = self.tokenizer.get_buckets() + self.tokenizer.get_nwords()
-        
+
         # Pad sequences efficiently
         padded_batch = torch.nn.utils.rnn.pad_sequence(
             indices_batch,
             batch_first=True,
             padding_value=padding_index,
         )
-        
+
         # Handle categorical variables efficiently
         if self.categorical_variables is not None:
-            categorical_tensors = torch.stack([
-                torch.tensor(cat_var, dtype=torch.float32) 
-                for cat_var in categorical_vars[0]  # Access first element since zip returns tuple
-            ])
+            categorical_tensors = torch.stack(
+                [
+                    torch.tensor(cat_var, dtype=torch.float32)
+                    for cat_var in categorical_vars[
+                        0
+                    ]  # Access first element since zip returns tuple
+                ]
+            )
         else:
             categorical_tensors = torch.empty(
-                padded_batch.shape[0], 1,
-                dtype=torch.float32,
-                device=padded_batch.device
+                padded_batch.shape[0], 1, dtype=torch.float32, device=padded_batch.device
             )
-        
+
         # Convert labels to tensor in one go
         y = torch.tensor(y, dtype=torch.long)
-        
+
         return (padded_batch, categorical_tensors, y)
 
     def create_dataloader(
@@ -131,8 +134,8 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         batch_size: int,
         shuffle: bool = False,
         drop_last: bool = False,
-        num_workers: int = os.cpu_count() -1,
-        **kwargs
+        num_workers: int = os.cpu_count() - 1,
+        **kwargs,
     ) -> torch.utils.data.DataLoader:
         """
         Creates a Dataloader.

@@ -113,7 +113,7 @@ def test_building(data):
     ):
         model = torchFastText(
             num_tokens=num_tokens,
-            num_rows=num_tokens+10,
+            num_rows=num_tokens + 10,
             embedding_dim=embedding_dim,
             min_count=min_count,
             min_n=min_n,
