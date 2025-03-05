@@ -56,7 +56,8 @@ model.train(
     X_val=val_data,
     y_val=val_labels,
     num_epochs=10,
-    batch_size=64
+    batch_size=64,
+    lr=4e-3
 )
 # Make predictions
 predictions = model.predict(test_data)
