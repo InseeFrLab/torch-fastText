@@ -1,0 +1,499 @@
+---
+title: "Exemple d'utilisation de la librairie `TorchFastText`"
+---
+
+
+
+_Warning_
+
+_`TorchFastText` library is still under active development. Have a regular look to [https://github.com/inseefrlab/torch-fastText](https://github.com/inseefrlab/torch-fastText) for latest information._
+
+To install package, you can run the following snippet
+
+```{python}
+#| output: false
+#| eval: false
+
+# Stable version
+pip install torchFastText 
+# Development version
+# pip install !https://github.com/InseeFrLab/torch-fastText.git
+```
+
+# Load and preprocess data
+
+In that guide, we propose to illustrate main package functionalities using that `DataFrame`:
+
+```{python}
+import pandas as pd
+df = pd.read_parquet("https://minio.lab.sspcloud.fr/projet-ape/extractions/20241027_sirene4.parquet")
+df = df.sample(10000)
+```
+
+Our goal will be to build multilabel classification for the `code` variable using `libelle` as feature. 
+
+## Enriching our test dataset
+
+Unlike `Fasttext`, this package offers the possibility of having several feature columns of different types (string for the text column and additional variables in numeric form, for example). To illustrate that, we propose the following enrichment of the example dataset:
+
+
+```{python}
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
+def categorize_surface(
+    df: pd.DataFrame, surface_feature_name: int, like_sirene_3: bool = True
+) -> pd.DataFrame:
+    """
+    Categorize the surface of the activity.
+
+    Args:
+        df (pd.DataFrame): DataFrame to categorize.
+        surface_feature_name (str): Name of the surface feature.
+        like_sirene_3 (bool): If True, categorize like Sirene 3.
+
+    Returns:
+        pd.DataFrame: DataFrame with a new column "surf_cat".
+    """
+    df_copy = df.copy()
+    df_copy[surface_feature_name] = df_copy[surface_feature_name].replace("nan", np.nan)
+    df_copy[surface_feature_name] = df_copy[surface_feature_name].astype(float)
+    # Check surface feature exists
+    if surface_feature_name not in df.columns:
+        raise ValueError(f"Surface feature {surface_feature_name} not found in DataFrame.")
+    # Check surface feature is a float variable
+    if not (pd.api.types.is_float_dtype(df_copy[surface_feature_name])):
+        raise ValueError(f"Surface feature {surface_feature_name} must be a float variable.")
+
+    if like_sirene_3:
+        # Categorize the surface
+        df_copy["surf_cat"] = pd.cut(
+            df_copy[surface_feature_name],
+            bins=[0, 120, 400, 2500, np.inf],
+            labels=["1", "2", "3", "4"],
+        ).astype(str)
+    else:
+        # Log transform the surface
+        df_copy["surf_log"] = np.log(df[surface_feature_name])
+
+        # Categorize the surface
+        df_copy["surf_cat"] = pd.cut(
+            df_copy.surf_log,
+            bins=[0, 3, 4, 5, 12],
+            labels=["1", "2", "3", "4"],
+        ).astype(str)
+
+    df_copy[surface_feature_name] = df_copy["surf_cat"].replace("nan", "0")
+    df_copy[surface_feature_name] = df_copy[surface_feature_name].astype(int)
+    df_copy = df_copy.drop(columns=["surf_log", "surf_cat"], errors="ignore")
+    return df_copy
+
+
+def clean_and_tokenize_df(
+    df,
+    categorical_features=["EVT", "CJ", "NAT", "TYP", "CRT"],
+    text_feature="libelle_processed",
+    label_col="apet_finale",
+):
+    df.fillna("nan", inplace=True)
+
+    df = df.rename(
+        columns={
+            "evenement_type": "EVT",
+            "cj": "CJ",
+            "activ_nat_et": "NAT",
+            "liasse_type": "TYP",
+            "activ_surf_et": "SRF",
+            "activ_perm_et": "CRT",
+        }
+    )
+
+    les = []
+    for col in categorical_features:
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col])
+        les.append(le)
+
+    df = categorize_surface(df, "SRF", like_sirene_3=True)
+    df = df[[text_feature, "EVT", "CJ", "NAT", "TYP", "SRF", "CRT", label_col]]
+
+    return df, les
+
+
+def stratified_split_rare_labels(X, y, test_size=0.2, min_train_samples=1):
+    # Get unique labels and their frequencies
+    unique_labels, label_counts = np.unique(y, return_counts=True)
+
+    # Separate rare and common labels
+    rare_labels = unique_labels[label_counts == 1]
+
+    # Create initial mask for rare labels to go into training set
+    rare_label_mask = np.isin(y, rare_labels)
+
+    # Separate data into rare and common label datasets
+    X_rare = X[rare_label_mask]
+    y_rare = y[rare_label_mask]
+    X_common = X[~rare_label_mask]
+    y_common = y[~rare_label_mask]
+
+    # Split common labels stratified
+    X_common_train, X_common_test, y_common_train, y_common_test = train_test_split(
+        X_common, y_common, test_size=test_size, stratify=y_common
+    )
+
+    # Combine rare labels with common labels split
+    X_train = np.concatenate([X_rare, X_common_train])
+    y_train = np.concatenate([y_rare, y_common_train])
+    X_test = X_common_test
+    y_test = y_common_test
+
+    return X_train, X_test, y_train, y_test
+
+def add_libelles(
+    df: pd.DataFrame,
+    df_naf: pd.DataFrame,
+    y: str,
+    text_feature: str,
+    textual_features: list,
+    categorical_features: list,
+):
+    missing_codes = set(df_naf["code"])
+    fake_obs = df_naf[df_naf["code"].isin(missing_codes)]
+    fake_obs[y] = fake_obs["code"]
+    fake_obs[text_feature] = fake_obs[[text_feature]].apply(
+        lambda row: " ".join(f"[{col}] {val}" for col, val in row.items() if val != ""), axis=1
+    )
+    df = pd.concat([df, fake_obs[[col for col in fake_obs.columns if col in df.columns]]])
+
+    if textual_features is not None:
+        for feature in textual_features:
+            df[feature] = df[feature].fillna(value="")
+    if categorical_features is not None:
+        for feature in categorical_features:
+            df[feature] = df[feature].fillna(value="NaN")
+
+    print(f"\t*** {len(missing_codes)} codes have been added in the database...\n")
+    return df
+```
+
+```{python}
+categorical_features = ["evenement_type", "cj",  "activ_nat_et", "liasse_type", "activ_surf_et", "activ_perm_et"]
+text_feature = "libelle"
+y = "apet_finale"
+textual_features = None
+
+naf2008 = pd.read_csv("https://minio.lab.sspcloud.fr/projet-ape/data/naf2008.csv", sep=";")
+df = add_libelles(df, naf2008, y, text_feature, textual_features, categorical_features)
+```
+
+
+## Preprocessing
+
+To reduce noise in text fields, we recommend pre-processing before training a model with our package. We assume this preprocessing is handled by the package user : this gives him the opportunity to control data cleansing. 
+
+Here's an example of the type of preprocessing that can be carried out before moving on to the modeling phase
+
+```{python}
+from torchFastText.preprocess import clean_text_feature
+df["libelle_processed"] = clean_text_feature(df["libelle"])
+```
+
+Right now, the model requires the label (variable y) to be a numerical variable. If the label variable is a text variable, we recommend using Scikit Learn's [LabelEncoder](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html) to convert into a numeric variable. Using that function will give user the possibility to get back labels from the encoder after running predictions.  
+
+```{python}
+encoder = LabelEncoder()
+df["apet_finale"] = encoder.fit_transform(df["apet_finale"])
+```
+
+The function `clean_and_tokenize_df` requires special `DataFrame` formatting:
+
+- First column contains the processed text (str)
+- Next ones contain the "encoded" categorical (discrete) variables in int format
+
+
+```{python}
+df, _ = clean_and_tokenize_df(df, text_feature="libelle_processed")
+X = df[["libelle_processed", "EVT", "CJ", "NAT", "TYP", "CRT", "SRF"]].values
+y = df["apet_finale"].values
+```
+
+## Splitting in train-test sets
+
+As usual in a learning approach, you need to break down your data into learning and test/validation samples to obtain robust performance statistics.
+
+This work is the responsibility of the package's users. Here's an example of how to do it, using the [`train_test_split`](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html) function in `Scikit`. 
+
+```{python}
+from sklearn.model_selection import train_test_split 
+X_train, X_test, y_train, y_test = train_test_split(X, y)
+```
+
+# Build the torch-fastText model (without training it)
+
+There are several ways to define and train a pytorch.fasttext model in this package. 
+
+We first show how to initialize the model and then afterwars build it. 
+
+`torchFastText` function accepts the following parameters:
+
+| Parameter                    | Meaning                                                             | Example Value |
+|---------------------------------|---------------------------------------------------------------------|--------------|
+| `num_tokens`                    | Number of rows in the embedding matrix (size of the vocabulary)   | 100000       |
+| `embedding_dim`                  | Dimension of the embedding (number of columns in the matrix)      | 50           |
+| `sparse`                         | Use sparse embedding for fast computation (PyTorch)               | False        |
+| `categorical_embedding_dims`      | Dimension of the embedding for categorical features               | 10           |
+| `min_count`                      | Minimum occurrences of a word in the corpus to be included        | 1            |
+| `min_n`                          | Minimum length of character n-grams                               | 3            |
+| `max_n`                          | Maximum length of character n-grams                               | 6            |
+| `len_word_ngrams`                | Length of word n-grams                                           | 3            |
+
+
+```{python}
+from torchFastText import torchFastText
+
+parameters = {
+    "num_tokens": 100000,
+    "embedding_dim": 50,
+    "sparse": False,
+    "categorical_embedding_dims": 10,
+    "min_count": 1,
+    "min_n": 3,
+    "max_n": 6,
+    "len_word_ngrams": 3,
+}
+
+parameters_train = {
+    "lr": 0.004,
+    "num_epochs": 1,
+    "batch_size": 256,
+    "patience": 3   
+}
+
+model = torchFastText(**parameters)
+```
+
+`model` is then a special `torchFastText` object:
+
+```{python}
+type(model)
+```
+
+As any `PyTorch` model, it accepts being save as a JSON for later on use:
+
+```{python}
+model.to_json('torchFastText_config.json')
+# model = torchFastText.from_json('torchFastText_config.json')
+```
+
+We can apply `build` to finally train our model. These are the parameters accepted by the `build` method
+
+| Parameter                    | Meaning                                                             | Example Value |
+|---------------------------------|---------------------------------------------------------------------|--------------|
+| `lr`                             | Learning rate                                                     | 0.004        |
+| `num_epochs`                     | Number of training epochs                                        | 1            |
+| `batch_size`                     | Batch size for training                                          | 256          |
+| `patience`                        | Early stopping patience (number of epochs without improvement)   | 3            |
+
+
+We build the model using the training data. 
+We have now access to the tokenizer, the PyTorch model as well as a PyTorch Lightning module ready to be trained.
+Note that Lightning is high-level framework for PyTorch that simplifies the process of training, validating, and deploying machine learning models.
+
+
+```{python}
+model.build(X_train, y_train, lightning=True, lr=parameters_train.get("lr"))
+```
+
+One can retrieve different objects from `model` instance:
+
+* `model.pytorch_model` 
+* `model.tokenizer` 
+* `model.lightning_module` 
+
+
+```{python}
+model.pytorch_model
+```
+
+```{python}
+model.tokenizer
+```
+
+```{python}
+model.lightning_module
+```
+
+One can also retrieve more precise information regarding the tokenizer. This can be useful to know how text is parsed before being given to the neural network:
+
+
+```{python}
+from pprint import pprint 
+sentence = ["lorem ipsum dolor sit amet"]
+pprint(model.tokenizer.tokenize(sentence)[2][0])
+```
+
+
+Saving parameters to JSON can also be done after building, but the model needs to be rebuilt after loading.
+
+```{python}
+model.to_json('torchFastText_config.json')
+```
+
+
+## Alternative way to build torchFastText 
+
+The training data is only useful to initialize the tokenizer, but X_train and y_train are not needed to initialize the PyTorch model, provided we give the right parameters to construct layer. 
+
+To highlight this, we provide a lower-level process to build the model where one can first build the tokenizer, and then build the model with custom architecture parameters. 
+
+The tokenizer can be loaded **from the same JSON file** as the model parameters, or initialized using the right arguments.
+
+
+```{python}
+del model
+```
+
+Let's decompose our features in two group:
+
+* We have our textual feature stored in the first column of the features matrix
+* All other columns are categorical variables
+
+```{python}
+training_text = X_train[:, 0].tolist()
+categorical_variables = X_train[:, 1:]
+```
+
+We need to create a few variables that will be useful afterwards
+
+```{python}
+CAT_VOCAB_SIZE = (np.max(categorical_variables, axis=0) + 1).astype(int).tolist()
+NUM_CLASSES = len(np.unique(y_train))
+NUM_CAT_VAR = categorical_variables.shape[1]
+```
+
+Now let's come to the nitty gritty. There are several ways to create an instance of the tokenizer. 
+
+First, we can create the tokenizer from :
+
+* model definition in the JSON file created beforehand
+* textual data in training dataset
+
+```{python}
+from torchFastText.datasets import NGramTokenizer
+tokenizer = NGramTokenizer.from_json('torchFastText_config.json', training_text)
+```
+
+```{python}
+tokenizer.tokenize("Hello world")
+```
+
+However, there is a more straightforward way to do: creating directly the `NGramTokenizer` instance:
+
+
+```{python}
+tokenizer = NGramTokenizer(
+    **parameters,
+    training_text=training_text
+    )
+```
+
+```{python}
+tokenizer.tokenize("Hello world")
+```
+
+Why creating a `NGramTokenizer` separately ? Because model constructor is now independent from training data:
+
+```{python}
+#| echo: false
+#| eval: false
+# TODO : allow to do that 
+#torchFastText.build_from_tokenizer(
+    #tokenizer,
+    #**parameters,
+    #**parameters_build
+# )
+```
+
+```{python}
+model = torchFastText.build_from_tokenizer(
+    tokenizer, 
+    embedding_dim=parameters["embedding_dim"], 
+    categorical_embedding_dims=parameters["categorical_embedding_dims"], 
+    sparse=parameters["sparse"], 
+    lr=parameters_train["lr"], 
+    num_classes=NUM_CLASSES, 
+    num_categorical_features=NUM_CAT_VAR, 
+    categorical_vocabulary_sizes=CAT_VOCAB_SIZE
+)
+```
+
+__Warning__:
+
+If the PyTorch model building did not use the training data, please keep in mind that its architecture (that you customize here) should match the vocabulary size of the categorical variables and the total number of class, otherwise the model will raise an error during training.
+
+
+# Train a torchFastText model directly
+
+If no advanced customization or PyTorch tuning is necessary, there is a direct way of training model.  
+
+
+```{python}
+#| eval: false
+model.train(
+    X_train,
+    y_train,
+    X_test,
+    y_test,
+    num_epochs=parameters_train['num_epochs'],
+    batch_size=parameters_train['batch_size'],
+    patience_scheduler=parameters_train['patience'],
+    patience_train=parameters_train['patience'],
+    lr=parameters_train['lr'],
+    verbose = True
+)
+```
+
+# Load a trained model from a Lightning checkpoint
+
+/!\ TOCOMPLETE 
+
+
+```{python}
+#| eval: false
+model.load_from_checkpoint(model.best_model_path) # or any other checkpoint path (string)
+```
+
+# Predicting from new labels
+
+
+```{python}
+#| eval: false
+text = ["coiffeur, boulangerie, pâtisserie"] # one text description
+X= np.array([[text[0], 0, 0, 0, 0, 0, 0]]) # our new entry
+TOP_K = 5
+
+pred, conf = model.predict(X, top_k=TOP_K)
+pred_naf = encoder.inverse_transform(pred.reshape(-1))
+subset = naf2008.set_index("code").loc[np.flip(pred_naf)]
+
+for i in range(TOP_K-1, -1, -1):
+    print(f"Prediction: {pred_naf[i]}, confidence:  {conf[0, i]}, description: {subset['libelle'][pred_naf[i]]}")
+
+```
+
+# Explainability
+
+
+```{python}
+#| eval: false
+from torchFastText.explainability.visualisation import (
+    visualize_letter_scores,
+    visualize_word_scores,
+)
+
+pred, conf, all_scores, all_scores_letters = model.predict_and_explain(X)
+visualize_word_scores(all_scores, text, pred_naf.reshape(1, -1))
+visualize_letter_scores(all_scores_letters, text, pred_naf.reshape(1, -1))
+```
