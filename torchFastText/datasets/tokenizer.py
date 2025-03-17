@@ -137,7 +137,7 @@ class NGramTokenizer:
     @staticmethod
     def get_word_ngram_id(hashes: Tuple[int], bucket: int, nwords: int) -> int:
         """
-        Get word ngram hash.
+        Get word ngram index in the embedding matrix.
 
         Args:
             hashes (Tuple[int]): Word hashes.
@@ -182,7 +182,10 @@ class NGramTokenizer:
 
     def get_subwords(self, word: str) -> Tuple[List[str], List[int]]:
         """
-        Return all subword tokens and indices for a given word.
+        Return all subwords tokens and indices for a given word.
+        Also adds the whole word token and indice if the word is in word_id_mapping 
+        (==> the word is in initial vocabulary + seen at least MIN_COUNT times).
+        Adds tags "<" and ">" to the word.
 
         Args:
             word (str): Word.
@@ -192,19 +195,21 @@ class NGramTokenizer:
         """
         tokens = []
         word_with_tags = "<" + word + ">"
+
+        # Get subwords and associated indices WITHOUT the whole word
         for n in range(self.min_n, self.max_n + 1):
-            tokens += self.get_ngram_list(word_with_tags, n)
+            ngrams = self.get_ngram_list(word_with_tags, n)
+            tokens += [ngram for ngram in ngrams if ngram != word_with_tags and ngram != word]  # Exclude the full word
+
         indices = [self.get_subword_index(token) for token in tokens]
+        assert word not in tokens
+        
+        # Add word token and indice only if the word is in word_id_mapping
+        if word in self.word_id_mapping.keys():
+            self.get_word_index(word)
+            tokens = [word] + tokens
+            indices = [self.get_word_index(word)] + indices
 
-        # Add word
-        try:
-            if word not in tokens:
-                indices = [self.get_word_index(word)] + indices
-                tokens = [word] + tokens
-
-        except KeyError:
-            # print("Token was not in mapping, not adding it to subwords.")
-            pass
         return (tokens, indices)
 
     def indices_matrix(self, sentence: str) -> tuple[torch.Tensor, dict, dict]:
