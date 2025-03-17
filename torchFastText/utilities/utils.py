@@ -12,19 +12,6 @@ import torch.nn.functional as F
 from ..preprocess import clean_text_feature
 
 
-def tokenized_text_in_tokens(
-    tokenized_text, id_to_token_dicts, padding_index=2009603, end_of_string_index=0
-):
-    return [
-        [
-            id_to_token_dicts[i][token_id.item()]
-            for token_id in tokenized_sentence
-            if token_id.item() not in {padding_index}
-        ]
-        for i, tokenized_sentence in enumerate(tokenized_text)
-    ]
-
-
 def preprocess_token(token):
     preprocessed_token = token.replace("</s>", "")
     preprocessed_token = preprocessed_token.replace("<", "")
