@@ -72,6 +72,8 @@ class NGramTokenizer:
                 i += 1
         self.nwords = len(self.word_id_mapping)
 
+        self.padding_index = self.num_tokens + self.get_nwords()
+
     def __str__(self) -> str:
         """
         Returns description of the NGramTokenizer.
@@ -314,12 +316,12 @@ class NGramTokenizer:
             list[list[str]]: List of tokenized text in str format.
 
         """
-        padding_index = self.padding_index
+
         return [
             [
                 id_to_token_dicts[i][token_id.item()]
                 for token_id in tokenized_sentence
-                if token_id.item() not in {padding_index}
+                if token_id.item() not in {self.padding_index}
             ]
             for i, tokenized_sentence in enumerate(tokenized_text)
         ]

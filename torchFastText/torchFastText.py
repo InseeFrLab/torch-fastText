@@ -106,16 +106,17 @@ class torchFastText:
                 )
 
             else:
-                self.num_rows = self.num_tokens + self.tokenizer.get_nwords() + 1
+                self.num_rows = self.tokenizer.padding_index + 1
 
         else:
             if self.tokenizer is not None:
-                if self.num_rows != self.num_tokens + self.tokenizer.get_nwords() + 1:
+                if self.num_rows != self.tokenizer.padding_index + 1:
                     logger.warning(
-                        f"Divergent values for num_rows: {self.num_rows} and {self.num_tokens + self.tokenizer.get_nwords() + 1}. It is set to the max."
+                        f"""Divergent values for num_rows: {self.num_rows} and {self.tokenizer.padding_index + 1} (tokenizer's padding index).
+                        It is set to the max. The padding index will be updated (Always set to num_rows - 1)."""
                     )
                 self.num_rows = max(
-                    self.num_rows, self.num_tokens + self.tokenizer.get_nwords() + 1
+                    self.num_rows, self.tokenizer.padding_index + 1
                 )
 
         self.padding_idx = self.num_rows - 1
