@@ -21,7 +21,6 @@ from ..utilities.utils import (
     compute_preprocessed_word_score,
     compute_word_score,
     explain_continuous,
-    tokenized_text_in_tokens,
 )
 from ..utilities.checkers import validate_categorical_inputs
 
@@ -388,7 +387,9 @@ class FastTextModel(nn.Module):
             text=text, categorical_variables=categorical_variables, top_k=top_k, explain=True
         )
 
-        tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
+        tokenized_text_tokens = self.tokenizer._tokenized_text_in_tokens(
+            tokenized_text, id_to_token_dicts
+        )
 
         # Step 2: Map the attributions at token level to the processed words
         processed_word_to_score_dicts, processed_word_to_token_idx_dicts = (

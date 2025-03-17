@@ -15,7 +15,6 @@ from queue import Queue
 import multiprocessing
 
 from ..preprocess import clean_text_feature
-from ..utilities.utils import tokenized_text_in_tokens
 
 
 class NGramTokenizer:
@@ -293,10 +292,37 @@ class NGramTokenizer:
             token_to_id_dicts.append(token_to_id)
 
         if text_tokens:
-            tokenized_text_tokens = tokenized_text_in_tokens(tokenized_text, id_to_token_dicts)
+            tokenized_text_tokens = self._tokenized_text_in_tokens(
+                tokenized_text, id_to_token_dicts
+            )
             return tokenized_text_tokens, tokenized_text, id_to_token_dicts, token_to_id_dicts
         else:
             return tokenized_text, id_to_token_dicts, token_to_id_dicts
+
+    def _tokenized_text_in_tokens(self, tokenized_text, id_to_token_dicts):
+        """
+        Convert tokenized text in int format to tokens in str format (given a mapping dictionary).
+        Private method. Used in tokenizer.tokenize and pytorch_model.predict()
+
+        Args:
+            tokenized_text (list): List of tokenized text in int format.
+            id_to_token_dicts (list[Dict]): List of dictionaries mapping token indices to tokens.
+
+            Both lists have the same length (number of sentences).
+
+        Returns:
+            list[list[str]]: List of tokenized text in str format.
+
+        """
+        padding_index = self.padding_index
+        return [
+            [
+                id_to_token_dicts[i][token_id.item()]
+                for token_id in tokenized_sentence
+                if token_id.item() not in {padding_index}
+            ]
+            for i, tokenized_sentence in enumerate(tokenized_text)
+        ]
 
     def get_vocab(self):
         return self.word_id_mapping

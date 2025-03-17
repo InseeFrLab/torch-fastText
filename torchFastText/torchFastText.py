@@ -96,7 +96,7 @@ class torchFastText:
     lightning_module: Optional[FastTextModule] = field(init=True, default=None)
     trained: bool = field(init=False, default=False)
 
-    direct_bagging: Optional[bool] = True # Use nn.EmbeddingBag instead of nn.Embedding
+    direct_bagging: Optional[bool] = True  # Use nn.EmbeddingBag instead of nn.Embedding
 
     def _build_pytorch_model(self):
         if self.num_rows is None:
@@ -628,9 +628,7 @@ class torchFastText:
             train_params = train_params | trainer_params
 
         # Trainer
-        self.trainer = pl.Trainer(
-            **train_params
-        )
+        self.trainer = pl.Trainer(**train_params)
 
         torch.cuda.empty_cache()
         torch.set_float32_matmul_precision("medium")
