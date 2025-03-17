@@ -115,9 +115,7 @@ class torchFastText:
                         f"""Divergent values for num_rows: {self.num_rows} and {self.tokenizer.padding_index + 1} (tokenizer's padding index).
                         It is set to the max. The padding index will be updated (Always set to num_rows - 1)."""
                     )
-                self.num_rows = max(
-                    self.num_rows, self.tokenizer.padding_index + 1
-                )
+                self.num_rows = max(self.num_rows, self.tokenizer.padding_index + 1)
 
         self.padding_idx = self.num_rows - 1
 
