@@ -400,7 +400,7 @@ class FastTextModel(nn.Module):
                 id_to_token_dicts,
                 token_to_id_dicts,
                 min_n=self.tokenizer.min_n,
-                padding_index=2009603,
+                padding_index=self.padding_idx,
                 end_of_string_index=0,
             )
         )
