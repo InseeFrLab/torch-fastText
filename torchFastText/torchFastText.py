@@ -119,6 +119,11 @@ class torchFastText:
 
         self.padding_idx = self.num_rows - 1
 
+        # If necessary, update the padding index in the tokenizer so that both match
+        # Needs to be up to date for tokenizing at inference time (tokenizer.tokenize())
+        if self.padding_idx != self.tokenizer.padding_index:
+            self.tokenizer.padding_index = self.padding_idx
+
         self.pytorch_model = FastTextModel(
             tokenizer=self.tokenizer,
             embedding_dim=self.embedding_dim,
