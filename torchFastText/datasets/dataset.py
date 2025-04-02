@@ -29,8 +29,8 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         self,
         categorical_variables: List[List[int]],
         texts: List[str],
-        outputs: List[int],
         tokenizer: NGramTokenizer,
+        outputs: List[int] = None,
         **kwargs,
     ):
         """
@@ -80,8 +80,12 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             self.categorical_variables[index] if self.categorical_variables is not None else None
         )
         text = self.texts[index]
-        y = self.outputs[index]
-        return text, categorical_variables, y
+
+        if self.outputs is not None:
+            y = self.outputs[index]
+            return text, categorical_variables, y
+        else:
+            return text, categorical_variables
 
     def collate_fn(self, batch):
         """
@@ -124,10 +128,12 @@ class FastTextModelDataset(torch.utils.data.Dataset):
                 padded_batch.shape[0], 1, dtype=torch.float32, device=padded_batch.device
             )
 
-        # Convert labels to tensor in one go
-        y = torch.tensor(y, dtype=torch.long)
-
-        return (padded_batch, categorical_tensors, y)
+        if self.outputs is not None:
+            # Convert labels to tensor in one go
+            y = torch.tensor(y, dtype=torch.long)
+            return (padded_batch, categorical_tensors, y)
+        else:
+            return (padded_batch, categorical_tensors)
 
     def create_dataloader(
         self,
