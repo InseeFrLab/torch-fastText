@@ -43,6 +43,13 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             y (List[int]): List of outcomes.
             tokenizer (Tokenizer): Tokenizer.
         """
+
+        if len(categorical_variables) != len(texts):
+            raise ValueError("Categorical variables and texts must have the same length.")
+        
+        if outputs is not None and len(outputs) != len(texts):
+            raise ValueError("Outputs and texts must have the same length.")
+            
         self.categorical_variables = categorical_variables
         self.texts = texts
         self.outputs = outputs
@@ -55,7 +62,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             int: Number of observations.
         """
-        return len(self.outputs)
+        return len(self.texts)
 
     def __str__(self) -> str:
         """
