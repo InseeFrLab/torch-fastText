@@ -44,7 +44,7 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             tokenizer (Tokenizer): Tokenizer.
         """
 
-        if len(categorical_variables) != len(texts):
+        if categorical_variables is not None and len(categorical_variables) != len(texts):
             raise ValueError("Categorical variables and texts must have the same length.")
         
         if outputs is not None and len(outputs) != len(texts):
