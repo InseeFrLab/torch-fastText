@@ -104,8 +104,12 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         Returns:
             Tuple[torch.LongTensor]: Observation with given index.
         """
+
         # Unzip the batch in one go using zip(*batch)
-        text, *categorical_vars, y = zip(*batch)
+        if self.outputs is not None:
+            text, *categorical_vars, y = zip(*batch)
+        else:
+            text, *categorical_vars = zip(*batch)
 
         # Convert text to indices in parallel using map
         indices_batch = list(map(lambda x: self.tokenizer.indices_matrix(x)[0], text))
