@@ -182,7 +182,7 @@ class NGramTokenizer:
     def get_subwords(self, word: str) -> Tuple[List[str], List[int]]:
         """
         Return all subwords tokens and indices for a given word.
-        Also adds the whole word token and indice if the word is in word_id_mapping 
+        Also adds the whole word token and indice if the word is in word_id_mapping
         (==> the word is in initial vocabulary + seen at least MIN_COUNT times).
         Adds tags "<" and ">" to the word.
 
@@ -198,11 +198,13 @@ class NGramTokenizer:
         # Get subwords and associated indices WITHOUT the whole word
         for n in range(self.min_n, self.max_n + 1):
             ngrams = self.get_ngram_list(word_with_tags, n)
-            tokens += [ngram for ngram in ngrams if ngram != word_with_tags and ngram != word]  # Exclude the full word
+            tokens += [
+                ngram for ngram in ngrams if ngram != word_with_tags and ngram != word
+            ]  # Exclude the full word
 
         indices = [self.get_subword_index(token) for token in tokens]
         assert word not in tokens
-        
+
         # Add word token and indice only if the word is in word_id_mapping
         if word in self.word_id_mapping.keys():
             self.get_word_index(word)
