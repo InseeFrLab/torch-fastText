@@ -152,15 +152,22 @@ class FastTextModelDataset(torch.utils.data.Dataset):
         shuffle: bool = False,
         drop_last: bool = False,
         num_workers: int = os.cpu_count() - 1,
+        pin_memory: bool = True,
+        persistent_workers: bool = True,
         **kwargs,
     ) -> torch.utils.data.DataLoader:
         """
-        Creates a Dataloader.
+        Creates a Dataloader from the FastTextModelDataset.
+        Use collate_fn() to tokenize and pad the sequences.
 
         Args:
             batch_size (int): Batch size.
             shuffle (bool, optional): Shuffle option. Defaults to False.
             drop_last (bool, optional): Drop last option. Defaults to False.
+            num_workers (int, optional): Number of workers. Defaults to os.cpu_count() - 1.
+            pin_memory (bool, optional): Set True if working on GPU, False if CPU. Defaults to True.
+            persistent_workers (bool, optional): Set True for training, False for inference. Defaults to True.
+            **kwargs: Additional arguments for PyTorch DataLoader.
 
         Returns:
             torch.utils.data.DataLoader: Dataloader.
@@ -174,7 +181,8 @@ class FastTextModelDataset(torch.utils.data.Dataset):
             collate_fn=self.collate_fn,
             shuffle=shuffle,
             drop_last=drop_last,
-            pin_memory=True,
+            pin_memory=pin_memory,
             num_workers=num_workers,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
+            **kwargs,
         )
