@@ -17,14 +17,18 @@ classifiers = [
 keywords = ["fastText", "text classification", "NLP", "automatic coding", "deep learning"]
 dependencies = [
     "numpy>=1.26.4",
-    "pytorch-lightning>=2.4.0"
+    "pytorch-lightning>=2.4.0",
 ]
 requires-python = ">=3.10"
 dynamic = ["version"]
 
 
 [project.optional-dependencies]
-explainability = ["unidecode", "nltk", "captum"]
+explainability = [
+    "unidecode",
+    "nltk",
+    "captum",
+]
 preprocess =     ["unidecode", "nltk"]
 
 [build-system]
