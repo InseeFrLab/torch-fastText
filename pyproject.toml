@@ -35,7 +35,7 @@ build-backend = "poetry.core.masonry.api"
 line-length = 100
 
 [tool.poetry]
-version = "0.0.1-dev"  # base version
+version = "0.1.0"  # base version
 packages = [{include = "torchFastText"}]
 
 [tool.poetry.requires-plugins]
